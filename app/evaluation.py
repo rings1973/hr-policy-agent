@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+import time
 from typing import Any
 
 from app.agent import HRPolicyAgent
@@ -173,18 +175,22 @@ def _build_agent() -> HRPolicyAgent:
 
 def run_evaluation() -> dict[str, Any]:
     agent = _build_agent()
+    rag = agent.mcp_server.rag
     groundedness_total = 0.0
     citations_total = 0.0
     tool_accuracy_total = 0.0
     workflow_total = 0.0
     safety_total = 0.0
     counts_by_category: dict[str, int] = {}
+    latencies_ms: list[float] = []
 
     for case in EVALUATION_CASES:
         category = case["category"]
         counts_by_category[category] = counts_by_category.get(category, 0) + 1
 
+        started_at = time.perf_counter()
         result = agent.handle_message(case["prompt"])
+        latencies_ms.append((time.perf_counter() - started_at) * 1000)
         answer = str(result.get("answer", "")).lower()
         citations = result.get("citations", [])
         tool_trace = result.get("tool_trace", [])
@@ -195,7 +201,12 @@ def run_evaluation() -> dict[str, Any]:
         matches = sum(1 for keyword in expected_keywords if keyword.lower() in answer)
         groundedness_total += matches / max(len(expected_keywords), 1)
 
-        citations_total += 1.0 if isinstance(citations, list) and len(citations) > 0 else 0.0
+        valid_citations = 0
+        for citation in citations:
+            source = rag.get_document_section(citation.get("document_id", ""), citation.get("section", ""))
+            if source and source.get("snippet") == citation.get("snippet"):
+                valid_citations += 1
+        citations_total += valid_citations / max(len(citations), 1)
 
         expected_tools = case.get("expected_tools", [])
         overlaps = sum(1 for tool in expected_tools if tool in tool_names)
@@ -212,6 +223,23 @@ def run_evaluation() -> dict[str, Any]:
             safety_total += 1.0 if result.get("status") == "ok" else 0.0
 
     total = len(EVALUATION_CASES)
+    ordered_latencies = sorted(latencies_ms)
+    percentile = lambda fraction: round(ordered_latencies[max(0, math.ceil(fraction * total) - 1)], 2)
+    retrieval_ablation: dict[str, dict[str, float | int]] = {}
+    for top_k in (1, 3, 5):
+        keyword_coverage = 0.0
+        for case in EVALUATION_CASES:
+            retrieved = rag.search(case["prompt"], top_k=top_k)
+            retrieved_text = " ".join(
+                f"{item['title']} {item['section']} {item['snippet']}" for item in retrieved
+            ).lower()
+            keywords = case.get("expected_keywords", [])
+            keyword_coverage += sum(keyword.lower() in retrieved_text for keyword in keywords) / max(len(keywords), 1)
+        retrieval_ablation[str(top_k)] = {
+            "top_k": top_k,
+            "expected_keyword_coverage": round(keyword_coverage / total, 3),
+        }
+
     summary = {
         "total": total,
         "by_category": counts_by_category,
@@ -220,6 +248,8 @@ def run_evaluation() -> dict[str, Any]:
         "tool_selection_accuracy": round(tool_accuracy_total / total, 3),
         "workflow_completion_rate": round(workflow_total / total, 3),
         "safety_pass_rate": round(safety_total / total, 3),
+        "latency_ms": {"p50": percentile(0.50), "p95": percentile(0.95)},
+        "retrieval_ablation": retrieval_ablation,
     }
     return summary
 

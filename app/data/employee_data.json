@@ -1,4 +1,5 @@
 {
+  "data_notice": "All employee records in this file are synthetic examples for testing and do not describe real people.",
   "employees": [
     {
       "employee_id": "E-1001",

@@ -12,14 +12,46 @@ class MCPToolServer:
 
     def list_tools(self) -> list[dict[str, Any]]:
         return [
-            {"name": "search_policy_documents", "description": "Search policy documents for relevant policy text."},
-            {"name": "get_policy_section", "description": "Return the exact section text for a document."},
-            {"name": "lookup_employee_profile", "description": "Retrieve a synthetic employee profile."},
-            {"name": "check_pto_balance", "description": "Return PTO balance for an employee."},
-            {"name": "lookup_benefits_status", "description": "Return benefits status and eligibility."},
-            {"name": "create_mock_hr_ticket", "description": "Create a mock HR ticket summary."},
-            {"name": "draft_hr_email", "description": "Draft a mock manager or HR message."},
-            {"name": "check_policy_compliance", "description": "Check whether a request complies with policy."},
+            {
+                "name": "search_policy_documents",
+                "description": "Search policy documents for relevant policy text.",
+                "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "k": {"type": "integer"}}, "required": ["query"]},
+            },
+            {
+                "name": "get_policy_section",
+                "description": "Return the exact section text for a document.",
+                "inputSchema": {"type": "object", "properties": {"document_id": {"type": "string"}, "section_name": {"type": "string"}}, "required": ["document_id", "section_name"]},
+            },
+            {
+                "name": "lookup_employee_profile",
+                "description": "Retrieve a synthetic employee profile.",
+                "inputSchema": {"type": "object", "properties": {"employee_id": {"type": "string"}}, "required": ["employee_id"]},
+            },
+            {
+                "name": "check_pto_balance",
+                "description": "Return PTO balance for an employee.",
+                "inputSchema": {"type": "object", "properties": {"employee_id": {"type": "string"}}, "required": ["employee_id"]},
+            },
+            {
+                "name": "lookup_benefits_status",
+                "description": "Return benefits status and eligibility.",
+                "inputSchema": {"type": "object", "properties": {"employee_id": {"type": "string"}}, "required": ["employee_id"]},
+            },
+            {
+                "name": "create_mock_hr_ticket",
+                "description": "Create a mock HR ticket summary.",
+                "inputSchema": {"type": "object", "properties": {"subject": {"type": "string"}, "summary": {"type": "string"}}, "required": ["subject", "summary"]},
+            },
+            {
+                "name": "draft_hr_email",
+                "description": "Draft a mock manager or HR message.",
+                "inputSchema": {"type": "object", "properties": {"recipient": {"type": "string"}, "body": {"type": "string"}}, "required": ["recipient", "body"]},
+            },
+            {
+                "name": "check_policy_compliance",
+                "description": "Check whether a request complies with policy.",
+                "inputSchema": {"type": "object", "properties": {"request_type": {"type": "string"}, "employee_id": {"type": "string"}}, "required": ["request_type"]},
+            },
         ]
 
     def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:

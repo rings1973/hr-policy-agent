@@ -15,6 +15,9 @@ def test_evaluation_runner_returns_summary():
     assert summary["total"] >= 20
     assert "by_category" in summary
     assert "groundedness" in summary
+    assert summary["latency_ms"]["p50"] >= 0
+    assert summary["latency_ms"]["p95"] >= summary["latency_ms"]["p50"]
+    assert set(summary["retrieval_ablation"]) == {"1", "3", "5"}
 
 
 def test_health_endpoint():
@@ -33,6 +36,7 @@ def test_chat_remote_work_question():
     assert response.status_code == 200
     payload = response.json()
     assert "answer" in payload
+    assert "Policy basis:" in payload["answer"]
     assert len(payload["citations"]) >= 1
     assert len(payload["tool_trace"]) >= 2
 

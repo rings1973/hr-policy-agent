@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+import json
+
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from app.agent import HRPolicyAgent
@@ -23,6 +25,55 @@ def health() -> dict[str, object]:
         "app": "hr-policy-agent",
         "mcp": {"connected": True, "tool_count": len(mcp_server.list_tools())},
     }
+
+
+@app.post("/mcp")
+async def mcp(request: Request) -> Response:
+    """Stateless MCP Streamable HTTP endpoint for initialize, discovery, and tool calls."""
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}, status_code=400)
+
+    if not isinstance(payload, dict) or payload.get("jsonrpc") != "2.0" or not isinstance(payload.get("method"), str):
+        return JSONResponse({"jsonrpc": "2.0", "id": payload.get("id") if isinstance(payload, dict) else None, "error": {"code": -32600, "message": "Invalid Request"}}, status_code=400)
+
+    method = payload["method"]
+    request_id = payload.get("id")
+    if method == "notifications/initialized" and request_id is None:
+        return Response(status_code=202)
+
+    if request_id is None:
+        return Response(status_code=202)
+
+    if method == "initialize":
+        params = payload.get("params") or {}
+        result = {
+            "protocolVersion": params.get("protocolVersion", "2025-03-26"),
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": "hr-policy-agent", "version": "1.0.0"},
+        }
+    elif method == "ping":
+        result = {}
+    elif method == "tools/list":
+        result = {"tools": mcp_server.list_tools()}
+    elif method == "tools/call":
+        params = payload.get("params") or {}
+        tool_name = params.get("name")
+        arguments = params.get("arguments") or {}
+        try:
+            tool_result = mcp_server.call_tool(tool_name, arguments)
+            result = {
+                "content": [{"type": "text", "text": json.dumps(tool_result, ensure_ascii=True)}],
+                "structuredContent": tool_result,
+                "isError": "error" in tool_result,
+            }
+        except (TypeError, ValueError) as error:
+            result = {"content": [{"type": "text", "text": str(error)}], "isError": True}
+    else:
+        return JSONResponse({"jsonrpc": "2.0", "id": request_id, "error": {"code": -32601, "message": f"Method not found: {method}"}}, status_code=200)
+
+    return JSONResponse({"jsonrpc": "2.0", "id": request_id, "result": result})
 
 
 class ChatRequest(BaseModel):

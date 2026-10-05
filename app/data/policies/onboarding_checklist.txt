@@ -1,0 +1,22 @@
+Synthetic New Hire Onboarding Procedure
+
+Purpose
+This procedure provides a consistent first-month checklist for new employees and their managers. It supplements, but does not replace, the applicable benefits, data security, equipment, and workplace policies. Managers should contact People Operations when an employee's location, employment type, or role does not fit the standard process.
+
+Before the Start Date
+The hiring manager confirms the employee's start date, role, manager, work location, and employment type in the approved HR record. People Operations verifies that required employment forms and eligibility steps have been communicated. The manager identifies role-specific training, initial projects, and a teammate who can answer practical questions. No one should send identity documents or payroll details through personal email or an unapproved chat channel.
+
+On the First Day
+The employee receives access only to the systems needed for the assigned role. The manager confirms that the employee can sign in using multifactor authentication and can find the current acceptable-use and data security policies. If access fails, the employee uses the service desk process; passwords and authentication codes must never be shared with a manager or coworker. The manager reviews the team's communication practices, working hours, emergency contacts, and expected availability.
+
+Equipment and Secure Work Setup
+The manager or service desk records the company equipment issued to the employee and confirms that required security updates are enabled. Employees use company-managed devices for company information and connect through approved access methods. Personal devices must not be used to store payroll, benefits, customer, or confidential employee records. Equipment purchases or home-office reimbursement requests must follow the expense policy and receive any required advance manager approval. A damaged or missing device should be reported promptly through the service desk and manager.
+
+First Week
+The manager checks that the employee understands the role, knows where to find team procedures, and has completed assigned security and conduct training. The employee reviews the relevant benefits enrollment deadlines and PTO request process. Managers explain how to request an accommodation or leave confidentially through People Operations, without asking the employee to disclose unnecessary medical details to the team. Questions about eligibility or a policy exception are referred to the responsible HR team rather than guessed at.
+
+First Month
+The manager schedules regular check-ins to discuss workload, training, access needs, and questions. The employee confirms that their profile, work location, manager relationship, and emergency contact details are accurate in the approved system. Managers review access when duties change and request removal of permissions that are no longer needed. Completion of onboarding tasks should be recorded in the approved system; this sample procedure does not create or update a real employee record.
+
+Escalation and Recordkeeping
+Urgent account compromise, lost devices, suspected exposure of confidential data, or workplace safety concerns must be reported immediately through the relevant security, safety, or HR channel. Benefits, leave, payroll, and employment eligibility questions should be directed to People Operations. Keep onboarding notes limited to necessary business information and store them only in approved systems. Do not place sensitive personal information in informal team documents.
