@@ -1,0 +1,43 @@
+{
+  "employees": [
+    {
+      "employee_id": "E-1001",
+      "name": "Ava Patel",
+      "role": "Senior Product Manager",
+      "location": "Boston, MA",
+      "employment_type": "full_time",
+      "manager_id": "M-42",
+      "pto_balance_days": 12,
+      "benefits_status": "active",
+      "remote_work_eligible": true,
+      "travel_policy_approved": true,
+      "security_training_complete": true
+    },
+    {
+      "employee_id": "E-1002",
+      "name": "Marcus Lee",
+      "role": "Customer Success Manager",
+      "location": "Seattle, WA",
+      "employment_type": "full_time",
+      "manager_id": "M-42",
+      "pto_balance_days": 7,
+      "benefits_status": "active",
+      "remote_work_eligible": true,
+      "travel_policy_approved": true,
+      "security_training_complete": true
+    },
+    {
+      "employee_id": "E-1003",
+      "name": "Sofia Romero",
+      "role": "Data Analyst",
+      "location": "Austin, TX",
+      "employment_type": "contract",
+      "manager_id": "M-18",
+      "pto_balance_days": 4,
+      "benefits_status": "pending",
+      "remote_work_eligible": false,
+      "travel_policy_approved": false,
+      "security_training_complete": true
+    }
+  ]
+}

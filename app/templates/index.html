@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HR Policy Agent</title>
+    <style>
+      body { font-family: Arial, sans-serif; background: #eef3ff; margin: 0; padding: 2rem; }
+      .card { max-width: 860px; margin: 0 auto; background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+      textarea { width: 100%; min-height: 100px; margin-top: 1rem; border-radius: 8px; border: 1px solid #d9e2f2; padding: 0.75rem; }
+      button { margin-top: 1rem; border: none; background: #1d4ed8; color: white; border-radius: 8px; padding: 0.8rem 1.2rem; cursor: pointer; }
+      pre { background: #f6f8fb; padding: 1rem; border-radius: 8px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>HR Policy Agent</h1>
+      <p>Ask about PTO, remote work, benefits, or policy compliance.</p>
+      <textarea id="prompt" placeholder="Example: Can Ava work remotely from another state for six weeks?"></textarea>
+      <button onclick="submitPrompt()">Ask</button>
+      <pre id="result">Loading...</pre>
+    </div>
+
+    <script>
+      async function submitPrompt() {
+        const prompt = document.getElementById('prompt').value;
+        const result = document.getElementById('result');
+        result.textContent = 'Thinking...';
+        const response = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: prompt })
+        });
+        const data = await response.json();
+        result.textContent = JSON.stringify(data, null, 2);
+      }
+    </script>
+  </body>
+</html>
