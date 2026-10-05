@@ -62,32 +62,164 @@ def index() -> str:
       <head>
         <title>HR Policy Agent</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 2rem; background: #f4f7fb; }
-          .card { max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-          textarea { width: 100%; height: 100px; padding: 0.75rem; }
-          button { padding: 0.75rem 1.25rem; margin-top: 0.75rem; background: #1f6feb; color: white; border: none; border-radius: 8px; cursor: pointer; }
-          #output { margin-top: 1.5rem; white-space: pre-wrap; }
+          body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: linear-gradient(180deg, #f3f8ff 0%, #eef1f7 100%);
+            color: #1f2937;
+          }
+          .card {
+            max-width: 860px;
+            margin: 2.5rem auto;
+            background: #ffffff;
+            padding: 2rem;
+            border-radius: 18px;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+          }
+          h1 {
+            margin: 0 0 1rem 0;
+            font-size: 2rem;
+            color: #1f4fd8;
+          }
+          .subtitle {
+            color: #52607a;
+            margin-bottom: 1rem;
+          }
+          textarea {
+            width: 100%;
+            min-height: 110px;
+            box-sizing: border-box;
+            padding: 1rem;
+            border: 1px solid #d8e0ef;
+            border-radius: 12px;
+            font-size: 1rem;
+            resize: vertical;
+            background: #f8fbff;
+          }
+          button {
+            margin-top: 1rem;
+            padding: 0.8rem 1.5rem;
+            background: linear-gradient(135deg, #2d6df6, #2257d6);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+          }
+          button:hover { filter: brightness(0.98); }
+          #output {
+            margin-top: 1.5rem;
+          }
+          .chat {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+          }
+          .assistant-message,
+          .source-card,
+          .trace-card {
+            padding: 1rem 1.1rem;
+            border-radius: 14px;
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+          }
+          .assistant-message {
+            background: #edf7ff;
+            border-color: #dbeafe;
+            line-height: 1.6;
+          }
+          .label {
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #495d7d;
+            margin-bottom: 0.45rem;
+          }
+          .status-pill {
+            display: inline-block;
+            margin-top: 0.8rem;
+            padding: 0.35rem 0.7rem;
+            background: #dcfce7;
+            color: #166534;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+          }
+          .source-card ul, .trace-card ul {
+            margin: 0.4rem 0 0 1.1rem;
+            padding: 0;
+          }
+          .source-card li, .trace-card li {
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+          }
         </style>
       </head>
       <body>
         <div class="card">
-          <h1>HR Policy Agent</h1>
-          <textarea id="message" placeholder="Ask about PTO, remote work, benefits, or policy compliance..."></textarea>
+          <h1>HR Policy Assistant</h1>
+          <div class="subtitle">Ask a question about PTO, remote work, benefits, or company policy.</div>
+          <textarea id="message" placeholder="Example: Can Ava work remotely from another state for six weeks?"></textarea>
           <button onclick="ask()">Ask</button>
           <div id="output"></div>
         </div>
         <script>
-          async function ask() {
-            const message = document.getElementById('message').value;
+          function renderResult(data) {
             const output = document.getElementById('output');
-            output.textContent = 'Thinking...';
+            const citations = Array.isArray(data.citations) ? data.citations : [];
+            const trace = Array.isArray(data.tool_trace) ? data.tool_trace : [];
+            const statusText = data.status ? data.status.toUpperCase() : 'OK';
+
+            output.innerHTML = `
+              <div class="chat">
+                <div class="assistant-message">
+                  <div class="label">Assistant</div>
+                  <div>${(data.answer || 'I can help with HR policy questions.').replace(/\n/g, '<br>')}</div>
+                  <div class="status-pill">${statusText}</div>
+                </div>
+
+                <div class="source-card">
+                  <div class="label">Sources</div>
+                  ${citations.length ? `<ul>${citations.map(item => `<li><strong>${item.title || item.document_id || 'Policy'}</strong> — ${item.section || 'Policy section'}<br>${item.snippet || ''}</li>`).join('')}</ul>` : '<p>No policy references were returned.</p>'}
+                </div>
+
+                <div class="trace-card">
+                  <div class="label">What I checked</div>
+                  ${trace.length ? `<ul>${trace.map(item => `<li><strong>${item.tool}</strong>: ${JSON.stringify(item.arguments || {})}</li>`).join('')}</ul>` : '<p>No extra checks were needed.</p>'}
+                </div>
+              </div>
+            `;
+          }
+
+          async function ask() {
+            const message = document.getElementById('message').value.trim();
+            const output = document.getElementById('output');
+            if (!message) {
+              output.innerHTML = `
+                <div class="assistant-message">
+                  <div class="label">Assistant</div>
+                  <div>Please ask a question about PTO, remote work, benefits, or company policy.</div>
+                </div>
+              `;
+              return;
+            }
+
+            output.innerHTML = `
+              <div class="assistant-message">
+                <div class="label">Assistant</div>
+                <div>Thinking about your HR question...</div>
+              </div>
+            `;
+
             const res = await fetch('/chat', {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({message})
             });
             const data = await res.json();
-            output.textContent = JSON.stringify(data, null, 2);
+            renderResult(data);
           }
         </script>
       </body>
