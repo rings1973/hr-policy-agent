@@ -162,56 +162,69 @@ def index() -> str:
           <h1>HR Policy Assistant</h1>
           <div class="subtitle">Ask a question about PTO, remote work, benefits, or company policy.</div>
           <textarea id="message" placeholder="Example: Can Ava work remotely from another state for six weeks?"></textarea>
-          <button onclick="ask()">Ask</button>
+          <button id="ask-button">Ask</button>
           <div id="output"></div>
         </div>
         <script>
-          function renderResult(data) {
+          function safeText(value) {
+            return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          }
+
+          window.renderResult = function(data) {
             const output = document.getElementById('output');
             const citations = Array.isArray(data.citations) ? data.citations : [];
             const trace = Array.isArray(data.tool_trace) ? data.tool_trace : [];
             const statusText = data.status ? data.status.toUpperCase() : 'OK';
+            const answerText = String(data.answer || 'I can help with HR policy questions.').split(String.fromCharCode(10)).join('<br>');
 
-            output.innerHTML = `
-              <div class="chat">
-                <div class="assistant-message">
-                  <div class="label">Assistant</div>
-                  <div>${(data.answer || 'I can help with HR policy questions.').replace(/\n/g, '<br>')}</div>
-                  <div class="status-pill">${statusText}</div>
-                </div>
+            const sourceHtml = citations.length ? '<ul>' + citations.map(function(item) {
+              const title = safeText(item.title || item.document_id || 'Policy');
+              const section = safeText(item.section || 'Policy section');
+              const snippet = safeText(item.snippet || '');
+              return '<li><strong>' + title + '</strong> — ' + section + '<br>' + snippet + '</li>';
+            }).join('') + '</ul>' : '<p>No policy references were returned.</p>';
 
-                <div class="source-card">
-                  <div class="label">Sources</div>
-                  ${citations.length ? `<ul>${citations.map(item => `<li><strong>${item.title || item.document_id || 'Policy'}</strong> — ${item.section || 'Policy section'}<br>${item.snippet || ''}</li>`).join('')}</ul>` : '<p>No policy references were returned.</p>'}
-                </div>
+            const traceHtml = trace.length ? '<ul>' + trace.map(function(item) {
+              const toolName = safeText(item.tool || 'Tool');
+              const argsText = safeText(JSON.stringify(item.arguments || {}));
+              return '<li><strong>' + toolName + '</strong>: ' + argsText + '</li>';
+            }).join('') + '</ul>' : '<p>No extra checks were needed.</p>';
 
-                <div class="trace-card">
-                  <div class="label">What I checked</div>
-                  ${trace.length ? `<ul>${trace.map(item => `<li><strong>${item.tool}</strong>: ${JSON.stringify(item.arguments || {})}</li>`).join('')}</ul>` : '<p>No extra checks were needed.</p>'}
-                </div>
-              </div>
-            `;
-          }
+            output.innerHTML =
+              '<div class="chat">' +
+              '<div class="assistant-message">' +
+              '<div class="label">Assistant</div>' +
+              '<div>' + answerText + '</div>' +
+              '<div class="status-pill">' + statusText + '</div>' +
+              '</div>' +
+              '<div class="source-card">' +
+              '<div class="label">Sources</div>' +
+              sourceHtml +
+              '</div>' +
+              '<div class="trace-card">' +
+              '<div class="label">What I checked</div>' +
+              traceHtml +
+              '</div>' +
+              '</div>';
+          };
 
-          async function ask() {
+          window.ask = async function() {
             const message = document.getElementById('message').value.trim();
             const output = document.getElementById('output');
             if (!message) {
-              output.innerHTML = `
-                <div class="assistant-message">
-                  <div class="label">Assistant</div>
-                  <div>Please ask a question about PTO, remote work, benefits, or company policy.</div>
-                </div>
-              `;
+              output.innerHTML =
+                '<div class="assistant-message">' +
+                '<div class="label">Assistant</div>' +
+                '<div>Please ask a question about PTO, remote work, benefits, or company policy.</div>' +
+                '</div>';
               return;
             }
 
-            output.innerHTML = `
-              <div class="assistant-message">
-                <div class="label">Assistant</div>
-                <div>Thinking about your HR question...</div>
-              </div>
-            `;
+            output.innerHTML =
+              '<div class="assistant-message">' +
+              '<div class="label">Assistant</div>' +
+              '<div>Thinking about your HR question...</div>' +
+              '</div>';
 
             const res = await fetch('/chat', {
               method: 'POST',
@@ -219,8 +232,15 @@ def index() -> str:
               body: JSON.stringify({message})
             });
             const data = await res.json();
-            renderResult(data);
-          }
+            window.renderResult(data);
+          };
+
+          document.addEventListener('DOMContentLoaded', function () {
+            const button = document.getElementById('ask-button');
+            if (button) {
+              button.addEventListener('click', window.ask);
+            }
+          });
         </script>
       </body>
     </html>

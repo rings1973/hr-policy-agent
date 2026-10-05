@@ -35,3 +35,12 @@ def test_chat_remote_work_question():
     assert "answer" in payload
     assert len(payload["citations"]) >= 1
     assert len(payload["tool_trace"]) >= 2
+
+
+def test_root_page_has_working_chat_script():
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.text
+    assert "window.ask = async function()" in html
+    assert "button.addEventListener('click', window.ask)" in html
+    assert "String.fromCharCode(10)" in html
