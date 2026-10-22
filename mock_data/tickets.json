@@ -1,0 +1,8 @@
+{
+  "synthetic": true,
+  "note": "Seed tickets. New tickets created by the agent are mock-only, held in memory, and never sent anywhere.",
+  "tickets": [
+    {"ticket_id": "HR-0001", "employee_id": "E-1001", "category": "remote_work", "subject": "Remote work from Maine, 10 days", "status": "closed", "created": "2026-07-02"},
+    {"ticket_id": "HR-0002", "employee_id": "E-1005", "category": "pto", "subject": "PTO balance correction request", "status": "open", "created": "2026-10-14"}
+  ]
+}

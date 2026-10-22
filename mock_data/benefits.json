@@ -1,0 +1,14 @@
+{
+  "synthetic": true,
+  "as_of": "2026-10-22",
+  "enrollments": [
+    {"employee_id": "E-1001", "status": "active", "medical": "PPO", "dental": true, "vision": true, "retirement_401k_percent": 6, "dependents": 2, "enrollment_deadline": null},
+    {"employee_id": "E-1002", "status": "active", "medical": "HMO", "dental": true, "vision": false, "retirement_401k_percent": 4, "dependents": 0, "enrollment_deadline": null},
+    {"employee_id": "E-1003", "status": "not_eligible", "medical": null, "dental": false, "vision": false, "retirement_401k_percent": 0, "dependents": 0, "enrollment_deadline": null, "note": "Contractor: core benefits excluded unless specified in contract."},
+    {"employee_id": "E-1004", "status": "pending", "medical": null, "dental": false, "vision": false, "retirement_401k_percent": 0, "dependents": 1, "enrollment_deadline": "2026-12-01", "note": "New hire: coverage begins 2026-11-01; elections not yet submitted."},
+    {"employee_id": "E-1005", "status": "active", "medical": "HDHP with HSA", "dental": true, "vision": true, "retirement_401k_percent": 10, "dependents": 3, "enrollment_deadline": null},
+    {"employee_id": "E-1006", "status": "active", "medical": "HMO", "dental": true, "vision": true, "retirement_401k_percent": 3, "dependents": 0, "enrollment_deadline": null, "note": "Part-time (24 h/week): medical/dental/vision eligible; no 401(k) match."},
+    {"employee_id": "E-1007", "status": "active", "medical": "PPO", "dental": true, "vision": true, "retirement_401k_percent": 5, "dependents": 1, "enrollment_deadline": null},
+    {"employee_id": "E-1008", "status": "not_eligible", "medical": null, "dental": false, "vision": false, "retirement_401k_percent": 0, "dependents": 0, "enrollment_deadline": null, "note": "Intern: not eligible for core benefits."}
+  ]
+}

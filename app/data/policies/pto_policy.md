@@ -1,9 +1,19 @@
+# Paid Time Off Policy
+
+## Purpose and Scope
+This policy explains how employees earn, request, and use paid time off (PTO). It applies to full-time and part-time employees. Contractors and interns do not accrue PTO under this policy; their time off is governed by their agreement.
+
+## Annual PTO Entitlement
+Full-time employees receive 15 days of annual PTO in their first two years of service. Entitlement increases to 20 days per year after two full years of service and to 25 days per year after five full years of service. Part-time employees accrue PTO on a prorated basis according to their scheduled hours. PTO accrues each pay period, and up to 5 unused days may be carried over into the next calendar year; carried-over days expire on March 31. New employees may use accrued PTO after completing 90 days of employment, except for emergency absences approved by People Operations.
+
+## Notice and Approval Requirements
+Manager approval is required before planned PTO is taken. Planned PTO requires at least 5 business days' notice. Requests for more than 3 consecutive business days require at least 10 business days' notice and a coverage plan. An employee may not request more PTO than their available balance; requests that exceed the balance must be discussed with People Operations, who may approve unpaid time off in limited cases. Emergency absences may be approved after the fact under the emergency process below.
 ## Planning and Submitting a Request
 Employees should submit planned PTO through the approved timekeeping or HR system as soon as dates are known. The request should include dates, whether the employee expects to be unavailable for full or partial days, and a basic coverage plan for active responsibilities. Employees should not include medical details or sensitive personal information in a routine vacation request. If the system is unavailable, notify the manager and People Operations through an approved channel and enter the request once service is restored.
 
 The request remains pending until the authorized manager approves it in the system. A calendar invitation or informal chat message does not establish approval. Employees should wait for confirmation before making nonrefundable arrangements. A manager may ask for clarification about coverage or scheduling, but should not request unnecessary personal details. The employee should receive a response in a reasonable period and can contact People Operations if the request remains unresolved.
 
-The sample policy recommends at least five days' notice for planned leave and ten business days when scheduling a predictable vacation. These are planning expectations, not a substitute for the current local policy or a guarantee of approval. Unexpected events may make advance notice impossible. The employee should inform the manager as soon as practicable and follow the emergency absence process rather than entering inaccurate dates.
+Planned PTO requires at least five business days' notice, and a predictable vacation of more than three consecutive business days should be requested at least ten business days in advance. These notice periods are requirements for planned time off, but they are not a substitute for the current local policy or a guarantee of approval. Unexpected events may make advance notice impossible. The employee should inform the manager as soon as practicable and follow the emergency absence process rather than entering inaccurate dates.
 
 ## Manager Review and Coverage
 Managers consider available balance, timing and duration, staffing levels, deadlines, customer commitments, and fairness across the team. Approval should be based on consistent business criteria, not retaliation or favoritism. Managers should consider requests in the order and manner required by the current process and explain a denial or proposed alternative clearly. When requested dates cannot be supported, discuss workable alternatives where practical.
@@ -35,16 +45,3 @@ Employees should not be asked to disclose a diagnosis to obtain routine scheduli
 Before a planned return, the employee should confirm the expected date if the HR system requests it. If the absence will be longer, contact the manager and People Operations as early as possible. Managers should coordinate work reassignment and access restoration through approved systems and should not pressure an employee to perform work while on approved PTO.
 
 Questions about request status, balance, a denial, or special leave should go to the manager or People Operations. Payroll handles balance and time-record corrections. The HR assistant can provide general policy text and mock workflow guidance but cannot approve leave or change a real balance. The official policy, employment terms, and applicable local rules control over this synthetic example.
-# Paid Time Off Policy
-
-## Annual PTO
-Employees accrue PTO based on tenure and employment status. Full-time employees receive 15 days of annual paid leave, with a minimum of 5 days of notice required for planned time off.
-
-## Manager Approval
-Manager approval is required before PTO can be approved. The business must maintain staffing coverage, and emergency leave may be approved after the fact if necessary.
-
-## PTO Request Timing
-PTO requests for more than 3 consecutive business days require manager approval and may require coverage planning. Vacation leave must be booked at least 10 business days in advance when scheduling is predictable.
-
-## Special Leave
-Medical leave, parental leave, and bereavement leave are handled under separate leave policies and may run concurrently with PTO. Policy questions should be routed to HR if the situation is not clearly covered by PTO rules.

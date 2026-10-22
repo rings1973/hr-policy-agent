@@ -9,6 +9,17 @@ Personal travel, entertainment, meals not tied to a business purpose, and duplic
 ## Equipment and Office Setup
 Employees may request reimbursement for approved home office equipment if the required purchase aligns with the role and has manager approval. Business justification and an itemized receipt are required.
 
+## Reimbursement Limits
+The following limits apply unless a documented exception is approved in advance:
+- Home office chair or desk: up to $300 per item, once every 3 years, with manager approval and an itemized receipt.
+- Monitors, keyboards, headsets, and other peripherals: up to $250 total per calendar year, with manager approval.
+- Laptops and other computing devices are not reimbursable. They must be requested from IT and issued as company-managed equipment under the equipment policy.
+- Home internet: up to $50 per month for employees approved for regular remote work; personal phone plans are not reimbursed.
+- Business meals while traveling: up to $75 per day per traveler, including tax and tip.
+- Lodging: up to $250 per night in standard markets and $350 per night in designated high-cost cities.
+- Any single expense over $500 requires pre-approval from both the manager and the budget owner.
+Expense reports must be submitted within 30 days of the transaction date. Expenses submitted more than 90 days after the transaction are not reimbursed.
+
 ## Approval Before Purchase
 Employees should obtain approval before committing company funds. The request should include the business purpose, estimated amount, date, cost center, vendor, attendees when relevant, and any required project or customer reference. A purchase order or procurement workflow may be required for equipment, subscriptions, or recurring services. Splitting a purchase into smaller transactions to avoid a review threshold is prohibited.
 

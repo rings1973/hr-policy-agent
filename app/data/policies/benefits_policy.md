@@ -1,7 +1,7 @@
 # Benefits and Eligibility Policy
 
 ## Eligibility
-Benefits coverage begins on the first day of the month following hire for eligible full-time employees. Contractors are not eligible for core health, dental, or retirement benefits unless otherwise specified in their contract.
+Benefits coverage begins on the first day of the month following hire for eligible full-time employees. Contractors are not eligible for core health, dental, or retirement benefits unless otherwise specified in their contract. Part-time employees scheduled for at least 20 hours per week are eligible for medical, dental, and vision coverage, but not for the 401(k) employer match. Interns are not eligible for core benefits. The company matches 401(k) contributions dollar-for-dollar up to 4% of eligible pay for full-time employees.
 
 ## Enrollment
 Employees must submit benefits elections during the open enrollment window or within 30 days of eligibility. Changes directly related to life events may require supporting documentation.

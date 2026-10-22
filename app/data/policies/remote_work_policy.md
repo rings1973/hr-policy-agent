@@ -4,16 +4,23 @@
 This policy describes when employees may work remotely, travel for work, and operate outside their assigned office location. The policy supports business continuity while maintaining security and compliance requirements.
 
 ## Eligibility
-Employees may work remotely up to 2 days per week if they are in a jurisdiction approved by People Ops and legal. Any work outside the employee's home state or country for longer than 2 weeks requires manager approval and a compliance review.
+Full-time and part-time employees whose profile is marked remote-work eligible may work remotely up to 2 days per week from their home location. Any work outside the employee's home state for longer than 14 calendar days (2 weeks) requires manager approval and a compliance review. Contractors and interns are not covered by this policy; their work location is governed by their agreement, and any change requires review by People Operations and the contract owner.
 
 ## Security and Compliance
 All remote workers must complete annual security training. Employees must use approved company devices and secure VPN access. Access to confidential payroll, customer support, and benefits systems is restricted to approved users only.
 
 ## Documentation
-Remote work requests should include the employee's location, travel dates, manager approval, and business justification. Requests for international work beyond 30 days require additional tax and immigration review.
+Remote work requests should include the employee's location, travel dates, manager approval, and business justification. Requests must be submitted at least 10 business days before the first remote workday outside the home state.
 
 ## Decision Rule
-If the employee's proposed location is not listed in the approved remote work map or if the request is longer than 30 days outside the home market, a manager and HR review is required before approval.
+The following thresholds apply under this policy:
+- Domestic work outside the home state for 14 calendar days or fewer: allowed with manager awareness if the state is on the approved remote work map.
+- Domestic work outside the home state for more than 14 calendar days, or in a state not on the approved map: manager approval and compliance review required before work begins.
+- Any international work, regardless of duration: manager approval, HR review, and security review required before work begins.
+- International work for more than 30 calendar days: all of the above plus tax and immigration review. Requests longer than 90 days are generally declined.
+
+## Tax and Location Considerations
+Working from another state or country can create tax withholding, payroll registration, permanent establishment, and immigration obligations for both the employee and the company. These obligations can begin after a small number of workdays, which is why the thresholds above apply even to short stays. The assistant and managers cannot determine tax or immigration consequences; those determinations are made only by the designated tax and immigration reviewers.
 
 ## Request and Approval Workflow
 Employees should submit a remote-work request before making travel commitments or beginning work from a new jurisdiction. The request should state the work location, home location, start and end dates, time zone, business reason, expected work schedule, and any customer or data access needs. The manager reviews role suitability and team coverage. People Operations and designated compliance reviewers determine location eligibility, employment implications, and any additional approval needed.
@@ -23,14 +30,14 @@ Approval is specific to the stated employee, location, dates, and work arrangeme
 The review may consider local employment rules, tax presence, immigration status, insurance coverage, data access, customer requirements, security controls, time-zone overlap, and the employee's role. Not all reviewers are needed for every request. The responsible teams decide which checks apply and may limit or decline a request if requirements cannot be met. The assistant can describe policy factors but cannot provide tax or immigration advice or approve the location.
 
 ## Short-Term Domestic Work
-Working outside the employee's regular home state for more than two weeks requires manager approval and a compliance review under this sample policy. Shorter periods may still require approval if the jurisdiction is not on the approved list, the employee handles restricted information, or local rules require review. Employees should confirm both the number of workdays and calendar dates because travel dates and work dates may differ.
+Working outside the employee's regular home state for more than 14 calendar days requires manager approval and a compliance review under this sample policy. Shorter periods may still require approval if the jurisdiction is not on the approved list, the employee handles restricted information, or local rules require review. Employees should confirm both the number of workdays and calendar dates because travel dates and work dates may differ.
 
 Before departure, the employee should confirm the location is approved, the work schedule is agreed, the manager has a coverage plan, and secure access is available. A short stay with family or a temporary change in lodging does not automatically exempt the employee from location rules. Employees may not perform work from a restricted destination simply because they are on vacation or visiting briefly.
 
 Managers should consider customer meetings, team handoffs, required in-person responsibilities, and practical working hours. If time-zone differences affect service, the employee and manager should agree on availability and response expectations in writing. Approved remote work does not require the employee to be available outside their normal schedule or during approved PTO.
 
 ## International Work and Travel
-International work involves additional review and must be approved before work begins. Requests exceeding 30 days outside the home market require tax and immigration review in this sample policy. A shorter stay may still require review due to destination restrictions, customer commitments, data handling, or employment status. A tourist entry permission should not be assumed to authorize work. The employee must obtain advice from the appropriate compliance team and must not rely on a general chat response to decide immigration status.
+International work of any duration involves manager, HR, and security review and must be approved before work begins. Requests exceeding 30 calendar days outside the home country also require tax and immigration review in this sample policy. A shorter stay may still require review due to destination restrictions, customer commitments, data handling, or employment status. A tourist entry permission should not be assumed to authorize work. The employee must obtain advice from the appropriate compliance team and must not rely on a general chat response to decide immigration status.
 
 The request should identify each country, work dates, personal travel dates, and systems or data that will be accessed. The employee should confirm that company equipment can be used lawfully and securely at the destination. International travel may restrict access to certain systems or data. The security team may require additional controls, prohibit local storage, or provide a managed device. An employee must not route traffic through a personal VPN or another person's account to bypass a restriction.
 

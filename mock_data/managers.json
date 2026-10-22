@@ -1,0 +1,8 @@
+{
+  "synthetic": true,
+  "managers": [
+    {"manager_id": "M-42", "name": "Jordan Rivera", "title": "Director of Product and Go-to-Market", "email": "jordan.rivera@example.com"},
+    {"manager_id": "M-18", "name": "Elena Park", "title": "Head of Data and Engineering", "email": "elena.park@example.com"},
+    {"manager_id": "M-07", "name": "Samuel Wright", "title": "VP Finance and People Operations", "email": "samuel.wright@example.com"}
+  ]
+}

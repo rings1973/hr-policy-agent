@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "as_of": "2026-10-22",
+  "unit": "days",
+  "balances": [
+    {"employee_id": "E-1001", "annual_entitlement": 25, "carryover": 2, "used": 15, "pending": 0, "available": 12, "eligible_to_use": true},
+    {"employee_id": "E-1002", "annual_entitlement": 20, "carryover": 0, "used": 11, "pending": 2, "available": 7, "eligible_to_use": true},
+    {"employee_id": "E-1003", "annual_entitlement": 0, "carryover": 0, "used": 0, "pending": 0, "available": 0, "eligible_to_use": false, "note": "Contractor: time off governed by contract, not the PTO policy."},
+    {"employee_id": "E-1004", "annual_entitlement": 15, "carryover": 0, "used": 0, "pending": 0, "available": 0.6, "eligible_to_use": false, "note": "New hire: PTO usable after 90 days of employment (2027-01-03)."},
+    {"employee_id": "E-1005", "annual_entitlement": 25, "carryover": 5, "used": 26, "pending": 2, "available": 2, "eligible_to_use": true},
+    {"employee_id": "E-1006", "annual_entitlement": 12, "carryover": 0, "used": 6.5, "pending": 0, "available": 5.5, "eligible_to_use": true, "note": "Part-time: prorated at 24/40 hours."},
+    {"employee_id": "E-1007", "annual_entitlement": 20, "carryover": 3, "used": 8, "pending": 0, "available": 15, "eligible_to_use": true},
+    {"employee_id": "E-1008", "annual_entitlement": 0, "carryover": 0, "used": 0, "pending": 0, "available": 0, "eligible_to_use": false, "note": "Intern: no PTO accrual."}
+  ]
+}
