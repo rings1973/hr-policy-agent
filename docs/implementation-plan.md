@@ -6,7 +6,7 @@ embeddings (TF-IDF baseline) · Render free tier · GitHub Actions. Sources: [`r
 
 ---
 
-## 0. Status (2026-10-22)
+## 0. Status (2026-10-23)
 
 | Item | State |
 |---|---|
@@ -15,7 +15,7 @@ embeddings (TF-IDF baseline) · Render free tier · GitHub Actions. Sources: [`r
 | NIST PDF excerpt + OPM HTML + `SOURCES.md` (4 formats, about 20k words) | ✅ done |
 | `mock_data/` (employees, managers, PTO, benefits, tickets, README) | ✅ done |
 | `docs/references.md` (links checked) | ✅ done |
-| `requirements.txt` pins, `.env.example`, `config.py`, `.dockerignore`, CI branch trigger | ⏳ Phase 0 |
+| `requirements.txt` pins, `.env.example`, `config.py`, `.dockerignore`, CI branch trigger | ✅ P0 done (2026-10-23); `employee_data.json` kept until P1/P2 replace `app/rag.py` |
 | Everything else | ⏳ Phases 1–8 below |
 
 **What you (the user) need to provide:**

@@ -32,7 +32,7 @@ async def mcp(request: Request) -> Response:
     """Stateless MCP Streamable HTTP endpoint for initialize, discovery, and tool calls."""
     try:
         payload = await request.json()
-    except Exception:
+    except ValueError:  # json.JSONDecodeError subclasses ValueError
         return JSONResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}, status_code=400)
 
     if not isinstance(payload, dict) or payload.get("jsonrpc") != "2.0" or not isinstance(payload.get("method"), str):
