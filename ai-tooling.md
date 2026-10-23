@@ -151,6 +151,24 @@ verified · any corrections.
     edits used Python `str.replace` with `assert s.count(old) == 1`, so a replacement that
     matches nothing fails loudly.
 
+- **Prompt:** "commit now and will start p2 later. also generate a nice summary of what was done",
+  then "push to wrap up p1 and create a file so i can test".
+- **Actions:**
+  - Published a Day 2 recap page for the teammate.
+  - Updated `RESUME_PROMPT.txt` (outside the repo) for session 3.
+  - Added `app/rag/explore.py`, a hands-on search tool showing both embedders side by side.
+  - Pushed P0–P1 to `skapali`.
+- **Verified:** explore was run in one-shot and in piped interactive mode before committing.
+- **Corrections:**
+  - The first explore output used box-drawing characters and `§`, which a cp1252 Windows console
+    prints as `?`. Switched to ASCII.
+  - The test run found that "Do we get free lunch?" scores 0.616 with Gemini, above the 0.60
+    cutoff. This is more evidence that the score measures topic similarity, not whether the
+    question is answered. Recorded in `docs/retrieval-calibration.md`.
+  - A Python `str.replace` sent through the shell had its `\n` escape mangled. The
+    `assert count == 1` guard caught it before anything was written, and the edit was redone
+    with the Edit tool.
+
 ## Retrospective
 
 _Filled in during P7 from the session log above._

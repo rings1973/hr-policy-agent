@@ -38,6 +38,17 @@ Scores are cosine similarity. Each cell shows `doc/section=score`.
 5. **TF-IDF thresholds don't separate.** The poem scored 0.21, higher than the correct
    "another country" hit at 0.15. TF-IDF remains as the keyless CI and fallback baseline only.
 
+6. **A question the policies don't answer can still score above the cutoff.** "Do we get free
+   lunch?" got 0.616 from Gemini (expense_policy > Meals, Meetings, and Representation), which is
+   above the 0.60 cutoff, so it was not flagged weak. The topic is close, but the section doesn't
+   answer the question. The score measures how close the topic is, not whether the question is
+   answered, so the P3 LLM must decide whether the retrieved text actually answers it.
+
+## Try it
+
+`python -m app.rag.explore` opens an interactive search showing both embedders side by side.
+`python -m app.rag.explore --help` lists the options.
+
 ## Operational notes
 
 - Gemini free tier: `embed_content` is limited to **100 texts per minute per model**, and each
