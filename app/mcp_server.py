@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.rag import EmployeeStore, PolicyRAG
+from app.legacy_rag import EmployeeStore, PolicyRAG
 
 
 class MCPToolServer:

@@ -106,6 +106,51 @@ verified · any corrections.
   - The pasted note mentioned "public API keys from GitHub". The team uses only its own AI
     Studio keys; keys found on GitHub are leaked credentials.
 
+- **Prompt:** "should groq be primary and gemini backup". **Answer:** yes. The evidence was the
+  measured latency (Groq instant, Gemini 63 s or 503), two separate providers for redundancy,
+  and Gemini then being a *different* model to act as the eval judge. No code change: the order
+  is `LLM_PROVIDERS` in `.env`.
+
+- **Prompt:** "yes start P1", then mid-task: "I want to use this opportunity to understand RAG
+  better as well".
+- **Actions:**
+  - Built `app/rag/`: `loaders.py` (md/txt/pdf/html; `source_type` and URL read from
+    `SOURCES.md` or the HTML `<meta>`), `chunker.py` (heading-aware, 350/60, contextual header
+    for embedding), `embeddings.py` (Gemini + TF-IDF), `index.py` (FAISS + SQLite +
+    manifest), `ingest.py`.
+  - Moved the old retriever to `app/legacy_rag.py`, since `app/rag.py` and `app/rag/` cannot
+    coexist.
+  - Built both indexes and ran a side-by-side comparison of 9 queries. The results are in
+    `docs/retrieval-calibration.md`.
+  - Explained RAG concepts against the real output, as the user asked.
+  - Wrote 15 tests in `tests/test_rag.py`. CI now builds the TF-IDF index.
+- **Verified:** 24/24 tests and ruff clean. The overlap test was mutation-checked: it fails
+  with `overlap=0`. The CI ingest command ran locally. The Gemini index built in 96 s with no
+  retries after pacing was added.
+- **Corrections:**
+  - **Terminal mojibake taken for file corruption (twice).** The Windows console showed `�`
+    for `’`, `½` and non-breaking spaces in the PDF and HTML output. The AI first concluded the
+    HTML file was corrupted and nearly "repaired" it. Counting `U+FFFD` in the file found
+    zero. Lesson: inspect bytes or escaped output (`backslashreplace`) before deciding data
+    is broken.
+  - **A print truncation read as a parser bug.** The table row looked like it had 2 of its 4
+    cells because the AI's own `[:600]` preview cut it off. The same mistake happened with an
+    80-character preview that seemed to show missing overlap. This is the CafeFlausse
+    "truncated output → wrong conclusion" failure again.
+  - **The Gemini quota counts texts, not requests.** The first build hit
+    429 `embed_content_free_tier_requests, limit: 100`. Batches of 50 were 3 calls but 150
+    texts. The fixed exponential backoff (2–16 s) was also shorter than the server's 27 s
+    `retryDelay`. Fixed by pacing to 90 texts a minute and honouring `retryDelay`. The ingest
+    fallback built TF-IDF as designed, but it left an empty `gemini/` directory, so embedding
+    now happens before the folder is created.
+  - **The plan's `MIN_SCORE=0.30` was wrong for both embedders.** Measured Gemini scores were
+    0.61–0.77 for relevant hits and 0.50–0.59 for nonsense. The threshold is now per embedder
+    and calibrated on data, and the docs state that it is a weak signal.
+  - A docstring inserted with `sed` landed after `from __future__` (so it was not a docstring),
+    and a second `sed` left a stray `n`. Both were caught by reading the file head. Later bulk
+    edits used Python `str.replace` with `assert s.count(old) == 1`, so a replacement that
+    matches nothing fails loudly.
+
 ## Retrospective
 
 _Filled in during P7 from the session log above._

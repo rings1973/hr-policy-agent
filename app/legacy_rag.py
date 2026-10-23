@@ -1,3 +1,6 @@
+"""Pre-P1 TF-IDF retriever and employee store. Still used by main.py, mcp_server.py and
+evaluation.py; deleted once P2-P4 move them onto app.rag and hr_mcp."""
+
 from __future__ import annotations
 
 import json

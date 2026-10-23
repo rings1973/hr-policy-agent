@@ -30,7 +30,8 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "gemini")
 INDEX_DIR = _path("INDEX_DIR", "app/data/index")
 VECTOR_TOP_K = int(os.getenv("VECTOR_TOP_K", "4"))
-MIN_SCORE = float(os.getenv("MIN_SCORE", "0.30"))
+# Optional override of the per-embedder weak-evidence threshold stored in manifest.json.
+MIN_SCORE = float(os.environ["MIN_SCORE"]) if os.getenv("MIN_SCORE") else None
 
 # MCP transport: "stdio" launches hr_mcp.server as a subprocess; "http" connects to MCP_SERVER_URL.
 MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio")
@@ -43,5 +44,5 @@ SEED = int(os.getenv("SEED", "42"))
 DATA_DIR = BASE_DIR / "app" / "data"
 POLICY_DIR = DATA_DIR / "policies"
 MOCK_DATA_DIR = _path("MOCK_DATA_DIR", "mock_data")
-# Legacy single-file data used by app/rag.py until P1/P2 move it onto MOCK_DATA_DIR.
+# Legacy single-file data used by app/legacy_rag.py until P1/P2 move it onto MOCK_DATA_DIR.
 EMPLOYEE_FILE = DATA_DIR / "employee_data.json"

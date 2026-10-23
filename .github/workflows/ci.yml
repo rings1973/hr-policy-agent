@@ -25,5 +25,11 @@ jobs:
       - name: Lint
         run: ruff check .
 
+      - name: Build keyless TF-IDF index
+        run: python -m app.rag.ingest --embedder tfidf --out "$RUNNER_TEMP/index"
+
       - name: Run tests
         run: pytest -q
+        env:
+          EMBEDDING_BACKEND: tfidf
+          INDEX_DIR: ${{ runner.temp }}/index

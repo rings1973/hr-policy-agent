@@ -8,8 +8,8 @@ from pydantic import BaseModel
 
 from app.agent import HRPolicyAgent
 from app.evaluation import run_evaluation
+from app.legacy_rag import EmployeeStore, PolicyRAG
 from app.mcp_server import MCPToolServer
-from app.rag import EmployeeStore, PolicyRAG
 
 app = FastAPI(title="HR Policy Agent")
 rag = PolicyRAG()

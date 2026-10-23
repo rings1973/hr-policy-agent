@@ -5,8 +5,8 @@ import time
 from typing import Any
 
 from app.agent import HRPolicyAgent
+from app.legacy_rag import EmployeeStore, PolicyRAG
 from app.mcp_server import MCPToolServer
-from app.rag import EmployeeStore, PolicyRAG
 
 EVALUATION_CASES: list[dict[str, Any]] = [
     {

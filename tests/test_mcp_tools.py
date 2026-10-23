@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
+from app.legacy_rag import PolicyRAG
 from app.main import agent, app
-from app.rag import PolicyRAG
 
 client = TestClient(app)
 

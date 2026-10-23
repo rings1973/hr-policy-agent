@@ -16,7 +16,8 @@ embeddings (TF-IDF baseline) · Render free tier · GitHub Actions. Sources: [`r
 | `mock_data/` (employees, managers, PTO, benefits, tickets, README) | ✅ done |
 | `docs/references.md` (links checked) | ✅ done |
 | `requirements.txt` pins, `.env.example`, `config.py`, `.dockerignore`, CI branch trigger | ✅ P0 done (2026-10-23); `employee_data.json` kept until P1/P2 replace `app/rag.py` |
-| Everything else | ⏳ Phases 1–8 below |
+| P1 `app/rag/` (loaders, chunker, Gemini + TF-IDF embedders, FAISS index, ingest) + 15 tests | ✅ done (2026-10-23): 137 chunks; `MIN_SCORE` is now per embedder (gemini 0.60, tfidf 0.10), see [`retrieval-calibration.md`](retrieval-calibration.md); old retriever moved to `app/legacy_rag.py` until P2–P4 |
+| Everything else | ⏳ Phases 2–8 below |
 
 **What you (the user) need to provide:**
 1. A Groq API key (console.groq.com) and a Gemini API key (aistudio.google.com) in a local `.env`. Never commit it.
