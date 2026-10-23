@@ -56,6 +56,7 @@ Excluded because of their licenses:
 - ⚠️ Groq pricing summary (third-party): https://eesel.ai/blog/groq-pricing
 - ✅ Gemini API rate limits (fallback LLM; actual quotas are shown in AI Studio): https://ai.google.dev/gemini-api/docs/rate-limits
 - ✅ Gemini OpenAI-compatible endpoint: https://ai.google.dev/gemini-api/docs/openai
+- ✅ Google AI Studio get-started (names `gemini-3.8-flash` as the default model; checked 2026-10-23, when `gemini-2.5-flash` returned 404 "no longer available to new users"): https://aistudio.google.com/docs/get-started
 - ⚠️ Gemini free-tier changes (third-party): https://agentdeals.dev/gemini-api-pricing-changes
 - ⚠️ OpenRouter free-tier limits (third-party): https://www.truefoundry.com/fr/blog/openrouter-rate-limits-your-free-tier-depends-on-what-youve-already-paid
 - ⚠️ Cerebras free plan (third-party): https://costbench.com/software/llm-api-providers/cerebras-inference/free-plan/

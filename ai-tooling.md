@@ -83,6 +83,29 @@ verified · any corrections.
     describing 13 files. It was caught by reading `git show --stat` and amended before any
     push. Lesson: check what a commit contains, not just that it ran.
 
+- **Prompt:** "added keys to .env file for groq and gemini", then the AI Studio get-started link
+  and a pasted note about `gemini-embedding-001`.
+- **Actions:** smoke-tested each key with a one-word call, without ever printing the keys.
+  - Groq (`openai/gpt-oss-120b`) answered "OK" at once.
+  - Gemini `gemini-embedding-001` returned 768 dimensions.
+  - Gemini chat with `gemini-2.5-flash` returned **404 "no longer available to new users"**.
+  - Listed the models this key can use and checked the AI Studio page the user linked. That
+    page names `gemini-3.8-flash` as the default, so `config.py`, `.env.example`, the plan and
+    `references.md` were updated to it.
+- **Measured:** `gemini-3.8-flash` answered "OK" after about 63 s on both the native SDK and the
+  OpenAI-compatible endpoint. Later calls timed out (90 s) or got an instant
+  503 "high demand". `gemini-3.5-flash-lite` answered in about 20 s.
+- **Corrections:**
+  - The plan's fallback model, chosen during research a day earlier, was already retired for
+    new keys. Model names from planning research go stale fast and need a live call to confirm.
+  - The 404 message suggested a replacement model. It was checked against the live model list
+    and the official page before being adopted, not taken on trust.
+  - A first `models.list()` call with no timeout hung for over 2 minutes with no output. It
+    was rerun with explicit timeouts and `max_retries=0`. Consequence for P3: every LLM call
+    needs a hard timeout, otherwise the "fallback" chain just waits forever.
+  - The pasted note mentioned "public API keys from GitHub". The team uses only its own AI
+    Studio keys; keys found on GitHub are leaked credentials.
+
 ## Retrospective
 
 _Filled in during P7 from the session log above._

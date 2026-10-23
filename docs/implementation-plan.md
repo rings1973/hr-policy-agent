@@ -41,7 +41,7 @@ Commit once per phase on `skapali`, then open a PR into `main`. Merging to `main
 |---|---|
 | `requirements.txt` | Runtime only, pinned: `fastapi==0.161.1 uvicorn==0.54.0 mcp==2.3.0 openai==3.37.0 google-genai==2.32.0 faiss-cpu==1.15.1 numpy==2.5.4 pypdf==6.21.2 beautifulsoup4==4.15.0 pyyaml==6.0.3 python-dotenv==1.0.1 jinja2==3.1.4 httpx==0.28.1` |
 | `requirements-dev.txt` | `-r requirements.txt` + `pytest==8.3.3 ruff==0.17.2`. This keeps the Render build smaller. |
-| `.env.example` | `LLM_PROVIDERS=groq,gemini` · `GROQ_API_KEY=` · `GROQ_MODEL=openai/gpt-oss-120b` · `GEMINI_API_KEY=` · `GEMINI_MODEL=gemini-2.5-flash` · `EMBEDDING_BACKEND=gemini` · `INDEX_DIR=app/data/index` · `VECTOR_TOP_K=4` · `MIN_SCORE=0.30` · `MCP_TRANSPORT=stdio` · `MCP_SERVER_URL=` · `AGENT_MAX_STEPS=6` · `SEED=42` |
+| `.env.example` | `LLM_PROVIDERS=groq,gemini` · `GROQ_API_KEY=` · `GROQ_MODEL=openai/gpt-oss-120b` · `GEMINI_API_KEY=` · `GEMINI_MODEL=gemini-3.8-flash` · `EMBEDDING_BACKEND=gemini` · `INDEX_DIR=app/data/index` · `VECTOR_TOP_K=4` · `MIN_SCORE=0.30` · `MCP_TRANSPORT=stdio` · `MCP_SERVER_URL=` · `AGENT_MAX_STEPS=6` · `SEED=42` |
 | `app/config.py` | Read all of the above from the environment. Add `MOCK_DATA_DIR`. Remove `OPENAI_API_KEY` and `MODEL_NAME`. |
 | `.dockerignore` | `.venv .env .git __pycache__ *.sqlite3 app/data/index logs evaluation/results/*.tmp` |
 | `.gitignore` | Add `app/data/index/` and `logs/`. |
