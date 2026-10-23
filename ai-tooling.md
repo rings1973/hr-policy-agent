@@ -168,6 +168,13 @@ verified · any corrections.
   - A Python `str.replace` sent through the shell had its `\n` escape mangled. The
     `assert count == 1` guard caught it before anything was written, and the edit was redone
     with the Edit tool.
+  - **The first CI run on `skapali` failed, while every local run had passed.** The cause was
+    `ModuleNotFoundError: No module named 'app'` at test collection. Locally the AI always ran
+    `python -m pytest`, which adds the current directory to `sys.path`. CI runs the bare
+    `pytest` entry point, which doesn't. The earlier "fresh venv" check also used `-m`, so it
+    hid the problem too. The failure was reproduced locally with `.venv/Scripts/pytest.exe`,
+    then fixed with `pyproject.toml` (`pythonpath = ["."]`). Lesson: run the exact command CI
+    runs, and treat a green CI run, not a green local run, as the proof.
 
 ## Retrospective
 

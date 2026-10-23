@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+# Make `import app` / `import hr_mcp` work under the bare `pytest` entry point (used in CI),
+# not only under `python -m pytest`, which adds the current directory to sys.path itself.
+pythonpath = ["."]
+testpaths = ["tests"]
