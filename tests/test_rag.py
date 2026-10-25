@@ -7,9 +7,16 @@ from itertools import pairwise
 import pytest
 
 from app.config import POLICY_DIR
-from app.rag import IndexMismatchError, PolicyIndex, open_index
-from app.rag.chunker import MAX_WORDS, chunk_documents, make_snippet, window_words
+from app.rag import Hit, IndexMismatchError, PolicyIndex, open_index
+from app.rag.chunker import (
+    MAX_WORDS,
+    chunk_documents,
+    is_disclaimer_only,
+    make_snippet,
+    window_words,
+)
 from app.rag.embeddings import TfidfEmbedder
+from app.rag.explore import hit_label
 from app.rag.index import build_index
 from app.rag.loaders import load_documents
 
@@ -98,6 +105,24 @@ def test_real_chunks_respect_max_words_and_snippets(docs):
     assert all(len(c.text.split()) <= MAX_WORDS for c in chunks)
     assert all(len(c.snippet) <= 241 for c in chunks)
     assert make_snippet("Short text.") == "Short text."
+
+
+def test_disclaimer_only_sections_are_not_chunked(docs):
+    chunks = chunk_documents(docs)
+    assert not any(c.text.startswith("Synthetic policy example") for c in chunks)
+    assert "holiday_policy#overview#0" not in {c.chunk_id for c in chunks}
+    # The guard is the disclaimer text, not the heading: a disclaimer followed by real rules stays.
+    assert is_disclaimer_only("Synthetic policy example for an educational assistant. Not legal advice.")
+    assert not is_disclaimer_only("Synthetic policy example. " + "Employees get 15 days of PTO. " * 20)
+    assert not is_disclaimer_only("This policy explains how holidays are published.")
+
+
+def test_explore_label_does_not_repeat_pdf_page():
+    def hit(section, page, source_type="company_policy"):
+        return Hit("c", "d", "T", section, page, source_type, None, "", "", 0.5, False)
+    assert hit_label(hit("Page 4", 4, "external_reference")) == "d > Page 4 [external]"
+    assert hit_label(hit("Eligibility", 2)) == "d > Eligibility, page 2"
+    assert hit_label(hit("Eligibility", None)) == "d > Eligibility"
 
 
 def test_remote_work_question_ranks_remote_policy_first(index):

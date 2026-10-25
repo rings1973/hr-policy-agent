@@ -16,7 +16,7 @@ import sys
 import textwrap
 
 from app import config
-from app.rag import PolicyIndex
+from app.rag import Hit, PolicyIndex
 from app.rag.loaders import COMPANY_POLICY, EXTERNAL_REFERENCE
 
 EMBEDDERS = ("gemini", "tfidf")
@@ -36,6 +36,13 @@ def load_indexes(names: list[str]) -> dict[str, PolicyIndex]:
     return indexes
 
 
+def hit_label(hit: Hit) -> str:
+    """"doc > section[, page N][ [external]]". PDF sections are already named "Page N"."""
+    page = f", page {hit.page}" if hit.page and hit.section != f"Page {hit.page}" else ""
+    tag = " [external]" if hit.source_type == EXTERNAL_REFERENCE else ""
+    return f"{hit.doc_id} > {hit.section}{page}{tag}"
+
+
 def show(indexes: dict[str, PolicyIndex], query: str, k: int, source_type: str | None,
          full: bool) -> None:
     for name, index in indexes.items():
@@ -49,9 +56,7 @@ def show(indexes: dict[str, PolicyIndex], query: str, k: int, source_type: str |
             print("   (no results)")
         for rank, hit in enumerate(hits, start=1):
             flag = "  WEAK" if hit.weak else ""
-            page = f", page {hit.page}" if hit.page else ""
-            tag = " [external]" if hit.source_type == EXTERNAL_REFERENCE else ""
-            print(f" {rank}. {hit.score:.3f}{flag}  {hit.doc_id} > {hit.section}{page}{tag}")
+            print(f" {rank}. {hit.score:.3f}{flag}  {hit_label(hit)}")
             body = hit.text if full else hit.snippet
             print(textwrap.indent(textwrap.fill(body, width=96), "      "))
 

@@ -40,6 +40,9 @@ MCP_SERVER_URL = os.getenv("MCP_SERVER_URL") or None
 # Agent
 AGENT_MAX_STEPS = int(os.getenv("AGENT_MAX_STEPS", "6"))
 SEED = int(os.getenv("SEED", "42"))
+# "Today" for date rules (90-day wait, notice periods). Empty means the real date; pin it
+# (YYYY-MM-DD) so evaluation runs give the same decisions on any day.
+REFERENCE_DATE = os.getenv("REFERENCE_DATE") or None
 
 DATA_DIR = BASE_DIR / "app" / "data"
 POLICY_DIR = DATA_DIR / "policies"

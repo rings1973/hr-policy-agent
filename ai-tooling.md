@@ -175,6 +175,136 @@ verified · any corrections.
     hid the problem too. The failure was reproduced locally with `.venv/Scripts/pytest.exe`,
     then fixed with `pyproject.toml` (`pythonpath = ["."]`). Lesson: run the exact command CI
     runs, and treat a green CI run, not a green local run, as the proof.
+  - **A made-up commit hash.** While updating the Day 2 recap with the push and CI result, the
+    AI wrote the latest commit as `e47c4b1`. It had never seen that commit's hash: the commit
+    command had printed only the file list. The AI noticed right after publishing, checked
+    `git log` (the real hash is `43f9ccf`) and republished. Lesson: any identifier put in a
+    shared document must be copied from tool output in this session, never filled in from memory.
+
+- **User testing (no code change):** the user ran `explore` with "how many total holidays?".
+  - Gemini's #1 chunk contained the answer, but only in the full text, not the snippet. The
+    policy lists 8 holidays and never states the number.
+  - The test also showed that disclaimer-only "Overview" chunks in 4 policies take up top-k
+    slots, and that PDF hits print "Page 4, page 4".
+  - Fix deferred to the start of P2 at the user's request; it is recorded in
+    `RESUME_PROMPT.txt` as P2 step 0. The point for the retrospective: the user's own hands-on
+    test found a retrieval-quality issue that the 24 tests and the AI's 9-query comparison had
+    missed.
+
+### Session 3 (2026-10-25): P2 step 0 (retrieval fix) and P2 MCP server
+
+- **Prompt:** "read the resume prompt file … and proceed from there". Mid-task: "ensure all
+  decisions are logged to ai-tooling.md". From then on, every design decision in this session
+  is recorded below with its reason, as it is made rather than at the end.
+- **State confirmed at start:** branch `skapali` up to date with origin (`43f9ccf`), 24/24
+  tests, ruff clean. The only uncommitted change was the end of the session 2 log.
+
+**P2 step 0: disclaimer chunks and the PDF label**
+- **Actions:**
+  - Captured the "before" output of `explore "how many total holidays?"` on the real indexes
+    before changing any code.
+  - `chunker.py`: added `is_disclaimer_only()`; `chunk_documents` skips those sections.
+  - `explore.py`: moved the hit label into `hit_label()`, which omits ", page N" when the
+    section is already "Page N".
+  - Two new tests. Rebuilt both indexes (137 → 133 chunks: exactly the 4 disclaimers removed).
+  - Added the holiday-count case to the P6 plan (now 27 cases).
+- **Verified:** 26/26 tests, ruff clean. After the fix, Gemini's top 4 for the holiday question
+  has no disclaimer: slot 2 moved from `Overview` (0.672, no content) to `Purpose and Scope`, and
+  `Eligibility and Pay Questions` (0.646) entered at slot 4. The PDF label now reads
+  `Page 4 [external]`. The holiday list was re-read in the source: 7 named holidays + 1 flexible
+  day = 8, and "8" never appears in the text.
+- **Observation:** Gemini scores of the surviving chunks did not change (each dense vector is
+  computed per chunk). TF-IDF scores moved slightly (0.111 → 0.110) because IDF depends on the
+  whole corpus. Any corpus edit changes every TF-IDF vector, but only the edited chunks of a
+  dense index.
+
+**Decisions (with reasons)**
+1. *Disclaimers are dropped at ingestion, not filtered at ranking.* The disclaimer chunk scored
+   0.672, above real content, because its title header ("Company Holiday … Policy > Overview")
+   matches the query. No score threshold can separate it, so it must never enter the index.
+2. *Match the disclaimer text plus a 60-word cap, not the "Overview" heading.* Other Overview
+   sections hold real rules, and the cap keeps a section that starts with the disclaimer but
+   continues with policy text. A test covers both cases.
+3. *The holiday eval case goes into the P6 plan now*, because `evaluation/cases.yaml` doesn't
+   exist until P6. Case counts and the call budget were updated to 27.
+4. *MCP errors: only `ToolError` is shown to the model.* This was read from the installed SDK
+   source (`mcp/server/mcpserver/exceptions.py`, `server.py:437-456`), which closes an open item
+   from session 2. Any other exception reaches the client only as "Error executing tool X".
+   So `data_store` and `rules` raise ordinary `LookupError`/`ValueError` (testable without MCP),
+   and `server.py` converts them to `ToolError` at the boundary.
+5. *Package layout follows the plan:* `hr_mcp/` (not `mcp/`, which would shadow the SDK), built
+   alongside the legacy `app/mcp_server.py`. The legacy module stays until P3/P4 replace
+   `app/main.py`, so the existing tests keep passing.
+6. *The ticket token is bound to its payload.* `confirm()` rejects a token when the arguments
+   differ from the proposed ones, so the user cannot approve one preview and get a different
+   ticket. Tokens are random (`secrets.token_urlsafe`), single-use and expire after 10 minutes.
+   The clock is injectable, so expiry is tested without sleeping.
+7. *`draft_hr_email` recipients:* an employee id, a manager id, or `PEOPLE-OPS`
+   (people.ops@example.com), resolved from the mock data so the model cannot invent addresses.
+8. *New config `REFERENCE_DATE`* (optional, YYYY-MM-DD) is "today" for the date rules. With the
+   real date, the 90-day wait and notice checks give different answers on different days, which
+   would make eval runs irreproducible. Added to `.env.example`.
+9. *Rules return a `Decision`; the LLM explains it, it does not decide.* Outcome precedence is
+   one function: any `fail` → `not_allowed`; else missing input → `needs_info`; else any
+   `review` → `needs_review`; else approvals → `allowed_with_approval`; else `allowed`.
+10. *`policy_ref` is "doc_id#Exact Heading"*, which can be passed straight to
+    `get_policy_section`. A test checks that every reference exists in the loaded corpus.
+11. *Policy readings encoded in `rules.py`* (each is a judgement call on the synthetic text):
+    - PTO notice counts weekdays from today (inclusive) to the start date (exclusive), so
+      Monday to next Monday is 5 business days. Holidays are not subtracted because the
+      calendar isn't in the data.
+    - Short notice and exceeding the balance are `fail` (the policy says "requires" / "may not"),
+      and the detail points to the emergency process or People Operations' unpaid-leave option.
+    - The 90-day wait is checked against the PTO *start date*, not today. E-1004 can plan PTO
+      that starts after 2027-01-03.
+    - Remote: international over 90 days is `fail` ("generally declined"; exceptions need every
+      owner). Domestic ≤14 days is allowed only after confirming the approved-state map (no map
+      data, so `action_required`), and it becomes a compliance `review` for employees who handle
+      restricted data (E-1005, E-1006), per "Short-Term Domestic Work".
+    - Incomplete security training blocks remote work (E-1004), per "Security and Equipment
+      Requirements".
+    - Expenses: a laptop is always `fail` (IT issues it); over $500 adds budget-owner approval;
+      home internet requires remote eligibility. The "once every 3 years" and "per year total"
+      limits are stated but not checked, because there is no purchase history in the data.
+12. *`search_policy_documents(include_external=False)` uses the index's own `source_type`
+    filter.* The first draft searched twice and filtered in Python, which was redundant because
+    `PolicyIndex.search` already over-fetches when filtering. Fixed before the first test run.
+13. *The index and data store open lazily* (`functools.cache`). The server answers
+    `initialize`/`list_tools` even if the index is missing, and only the search tools fail.
+14. *Async MCP tests use `anyio.run()` inside ordinary sync tests* rather than adding
+    pytest-asyncio. anyio already ships with the SDK, so there are no new dependencies. Each
+    test starts its own server subprocess (about 3 s each), which is acceptable at 4 tests.
+15. *MCP tests are hermetic.* The fixture builds a TF-IDF index in a temp directory and passes
+    `INDEX_DIR`, `EMBEDDING_BACKEND=tfidf` and `REFERENCE_DATE=2026-10-22` through the
+    subprocess environment. They need no key and give the same result on any day and in CI.
+    (`load_dotenv` does not override variables already set, so the passed values win over
+    `.env`.)
+16. *The streamable-HTTP transport binds 0.0.0.0 on `MCP_HTTP_PORT` (default 8765)*, ready
+    for a container. It is not tested yet; mounting it inside FastAPI is a P4 decision.
+
+**P2: MCP server**
+- **Actions:** `hr_mcp/__init__.py`, `data_store.py`, `rules.py`, `server.py` (9 tools);
+  `tests/test_rules.py` (32 table-driven tests: PTO, remote and expense rules, business-day
+  counting, every `policy_ref` resolves, lookups, token single-use/binding/expiry with an
+  injected clock); `tests/test_mcp_server.py` (4 tests over a real stdio `ClientSession`:
+  tool list and annotations, data tools, `is_error` for an unknown id and a bad date, compliance
+  decision for Demo 1, draft email, search/section/list, ticket propose → swapped-payload
+  rejected → created → reuse rejected).
+- **Verified:** 62/62 with the bare `pytest` entry point (the command CI runs), ruff clean.
+  Mutation check: raising the international tax threshold from 30 to 45 days, and disabling the
+  payload-binding check, each made both the unit and the stdio tests fail (4 failures); with the
+  code restored, everything passes. Plan items checked: E-1002 3 days → allowed with approval;
+  E-1004 PTO → not allowed (90-day wait); E-1003 remote → not allowed; E-1001 Mexico 42 days →
+  tax and immigration review; chair $450 → over the limit.
+- **Not done:** the plan's "done when" check with the MCP Inspector (`mcp dev hr_mcp/server.py`,
+  which needs Node). The stdio tests cover the same list/call path programmatically; the
+  Inspector run is left for the user as a demo screenshot.
+- **Corrections:** none needed by the user this session. The redundant double search
+  (decision 12) was caught by the AI re-reading its own draft.
+- **Prompt (wrap-up):** "let's wrap up after this and update the next resumption prompt. how
+  many more stages to go?" Answer: 6 phases remain (P3 agent, P4 web app, P5 CI/CD + deploy,
+  P6 evaluation, P7 docs, P8 deploy + demo). Committed P2 on `skapali` (not pushed, per the
+  working agreement) and rewrote `RESUME_PROMPT.txt` for session 4.
 
 ## Retrospective
 

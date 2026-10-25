@@ -17,7 +17,9 @@ embeddings (TF-IDF baseline) · Render free tier · GitHub Actions. Sources: [`r
 | `docs/references.md` (links checked) | ✅ done |
 | `requirements.txt` pins, `.env.example`, `config.py`, `.dockerignore`, CI branch trigger | ✅ P0 done (2026-10-23); `employee_data.json` kept until P1/P2 replace `app/rag.py` |
 | P1 `app/rag/` (loaders, chunker, Gemini + TF-IDF embedders, FAISS index, ingest) + 15 tests | ✅ done (2026-10-23): 137 chunks; `MIN_SCORE` is now per embedder (gemini 0.60, tfidf 0.10), see [`retrieval-calibration.md`](retrieval-calibration.md); old retriever moved to `app/legacy_rag.py` until P2–P4 |
-| Everything else | ⏳ Phases 2–8 below |
+| P2 step 0: disclaimer-only chunks dropped, PDF label fixed (137 → 133 chunks) | ✅ done (2026-10-25) |
+| P2 `hr_mcp/` (data_store, rules, server with 9 tools) + 32 rule tests + 4 real stdio `ClientSession` tests | ✅ done (2026-10-25): 62 tests total. `REFERENCE_DATE` pins "today" for date rules. MCP Inspector check (`mcp dev`) not yet run |
+| Everything else | ⏳ Phases 3–8 below |
 
 **What you (the user) need to provide:**
 1. A Groq API key (console.groq.com) and a Gemini API key (aistudio.google.com) in a local `.env`. Never commit it.
@@ -225,11 +227,11 @@ Update the `Dockerfile` to match (non-root user, build the index in the image) a
 
 ## P6. Evaluation: `evaluation/` (≈5 h)
 
-**`evaluation/cases.yaml`** has 26 cases. Fields: `id, category, prompt, employee_id, gold_answer, gold_facts[], gold_docs[], expected_tools[], forbidden_tools[], expected_status`.
+**`evaluation/cases.yaml`** has 27 cases. Fields: `id, category, prompt, employee_id, gold_answer, gold_facts[], gold_docs[], expected_tools[], forbidden_tools[], expected_status`.
 
 | Category | n | Examples |
 |---|---|---|
-| Single-doc policy | 7 | PTO by tenure (15/20/25) · chair limit $300 · laptop goes through IT · enrollment window 30 days · part-time benefits · security training before remote access · carryover of 5 days, expires Mar 31 |
+| Single-doc policy | 8 | PTO by tenure (15/20/25) · chair limit $300 · laptop goes through IT · enrollment window 30 days · part-time benefits · security training before remote access · carryover of 5 days, expires Mar 31 · **"How many holidays are there?"** → the sample calendar lists 8 (7 named + 1 flexible personal observance day); the official count is People Operations' annual calendar. The number 8 never appears in `holiday_policy.md`, so this tests counting plus the caveat (found by user testing, 2026-10-23) |
 | Multi-doc | 5 | remote from another state: remote + security + tax · international trip: remote + expense + security · new hire's first month: onboarding + benefits + PTO · home office setup: expense + equipment · leave longer than 3 days: PTO + leave |
 | Tool workflows | 7 | **Demo 1** (E-1001, Mexico City, 6 weeks) · **Demo 2** (E-1002, 3 days next week) · E-1003 benefits · E-1004 PTO (blocked) · E-1005 PTO 3 days (exceeds balance) · E-1007 chair $280 · E-1001 ticket, then confirm |
 | Ambiguous | 3 | "Can I take some days off?" with no employee · "Is this reimbursable?" · "What about my manager?" → `clarify` |
@@ -255,7 +257,7 @@ Update the `Dockerfile` to match (non-root user, build the index in the image) a
 
 **Runner:** `python -m evaluation.run_eval --target local|https://… --mode full|rag_only --k 4 --embedder gemini --judge on`. It writes `evaluation/results/<UTC>_<config>.json` and regenerates `evaluation/report.md`. Cases run in file order with a fixed `SEED` and temperature 0.
 
-**Budget:** one full run is about 26 × 4 Groq calls plus 26 Gemini judge calls. Three runs a day fit within Groq's 1K requests per day. Add a 2 s sleep between cases to stay under 30 requests per minute.
+**Budget:** one full run is about 27 × 4 Groq calls plus 27 Gemini judge calls. Three runs a day fit within Groq's 1K requests per day. Add a 2 s sleep between cases to stay under 30 requests per minute.
 
 ---
 

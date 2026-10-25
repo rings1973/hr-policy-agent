@@ -13,6 +13,11 @@ OVERLAP_WORDS = 60
 SNIPPET_CHARS = 240
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[\"'(\[]?[A-Z0-9])")
+# The synthetic policies open with a one-paragraph disclaimer that lands in its own "Overview"
+# section. Its title-prefixed embedding scores high (0.67 for "how many holidays?") while it holds
+# no policy content, so it would take a top-k slot. Real sections never start this way.
+_DISCLAIMER = re.compile(r"^\s*Synthetic policy example\b", re.IGNORECASE)
+DISCLAIMER_MAX_WORDS = 60
 
 
 @dataclass
@@ -89,6 +94,12 @@ def make_snippet(text: str, limit: int = SNIPPET_CHARS) -> str:
     return cut[:cut.rfind(" ")].rstrip(",;:") + "…"
 
 
+def is_disclaimer_only(text: str) -> bool:
+    """True for a section that is just the synthetic-policy disclaimer. The word cap keeps a
+    section that starts with the disclaimer but goes on to real rules."""
+    return bool(_DISCLAIMER.match(text)) and len(text.split()) <= DISCLAIMER_MAX_WORDS
+
+
 def chunk_documents(
     docs: list[Document], max_words: int = MAX_WORDS, overlap: int = OVERLAP_WORDS
 ) -> list[Chunk]:
@@ -96,6 +107,8 @@ def chunk_documents(
     for doc in docs:
         seen: Counter[str] = Counter()
         for section in doc.sections:
+            if is_disclaimer_only(section.text):
+                continue
             slug = slugify(section.heading)
             for text in window_words(section.text, max_words, overlap):
                 # Numbering per (doc, heading) keeps ids stable and unique even when a
