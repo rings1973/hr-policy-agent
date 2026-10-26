@@ -1,12 +1,12 @@
 # Implementation Plan: HR Policy Agent (Quantic MSAIE Project 3)
 
 Goal: meet every requirement in `MSAIEProject3.pdf` at rubric **level 5**.
-Stack: FastAPI · MCP Python SDK v2.3.0 (`MCPServer`, stdio) · Groq LLM with Gemini fallback · FAISS + Gemini
+Stack: FastAPI · MCP Python SDK v2.3.0 (`MCPServer`, stdio) · Groq LLMs (qwen3.8-27b → gpt-oss-120b → gpt-oss-20b) with Gemini fallback · FAISS + Gemini
 embeddings (TF-IDF baseline) · Render free tier · GitHub Actions. Sources: [`references.md`](references.md).
 
 ---
 
-## 0. Status (2026-10-23)
+## 0. Status (2026-10-26)
 
 | Item | State |
 |---|---|
@@ -21,7 +21,8 @@ embeddings (TF-IDF baseline) · Render free tier · GitHub Actions. Sources: [`r
 | P2 `hr_mcp/` (data_store, rules, server with 9 tools) + 32 rule tests + 4 real stdio `ClientSession` tests | ✅ done (2026-10-25): 62 tests total. `REFERENCE_DATE` pins "today" for date rules. MCP Inspector check (`mcp dev`) not yet run |
 | P3 `app/agent/` (orchestrator, MCP client, LLM chain, guardrails, terminal chat) + 10th tool `project_pto_balance` + 13 FakeLLM agent tests | ✅ done (2026-10-26): 83 tests. Demo 1, Demo 2, safety case and the accrual question pass live on Groq (qwen → gpt-oss chain). Deferred: `fallback_agent.py`, LLM guardrail classifier, HTTP transport |
 | P4 web app (pulled forward for the demo): `app/main.py` + `app/static/index.html`, question library (`app/demo_questions.py`, `docs/demo-questions.md`), 6 app tests | 🔶 mostly done (2026-10-26): 82 tests. Not yet: `/mcp` HTTP mount, `/eval/latest`, deleting legacy modules |
-| Everything else | ⏳ Phases 3–8 below |
+| Teammate progress demo (2026-10-27) | Web app run locally (`uvicorn app.main:app`), 4 demo tasks from the question library; terminal chat as backup |
+| Everything else | ⏳ P4 remainder, then P5–P8 below. Order after the demo: merge decision with the teammate → P5 deploy → P6 evaluation → P7 docs → P8 video |
 
 **What you (the user) need to provide:**
 1. A Groq API key (console.groq.com) and a Gemini API key (aistudio.google.com) in a local `.env`. Never commit it.
@@ -165,12 +166,13 @@ Index layout: `app/data/index/<embedder>/{faiss.index, chunks.sqlite3, manifest.
 
 | Endpoint | Behavior |
 |---|---|
-| `GET /` | Jinja UI |
+| `GET /` | UI (built as one static `app/static/index.html`, no Jinja) |
 | `POST /chat` | Request `{message, session_id?, employee_id?}`. Response `{answer, policy_facts, recommendations, citations:[{chunk_id, doc_id, title, section, page, snippet}], tool_trace:[...], status, pending_action?, provider, latency_ms}` |
 | `POST /chat/confirm` | Request `{session_id, token, approve: bool}`. Approve calls `create_mock_hr_ticket` with the token through MCP; reject discards it. |
 | `GET /health` | `{status, version, mcp:{connected, transport, tool_count, ping_ms}, llm:{providers_configured}, index:{embedder, chunks, documents}}` |
 | `GET /tools` | Live `list_tools()` from MCP, used for the UI and grader. |
-| `GET /demo-tasks` | The 2 demo tasks with prompt, employee_id and expected tool sequence. |
+| `GET /demo-tasks` | The question library from `app/demo_questions.py`: 24 questions in 5 groups, each with employee_id and the expected result. |
+| `GET /employees` | Ids, names and roles for the "Acting as" picker (added during the build). |
 | `GET /eval/latest` | Latest `evaluation/results/*.json` summary. |
 | `/mcp` (optional) | Mount `mcp.streamable_http_app(stateless_http=True, json_response=True)` so graders can call `tools/list` over HTTP. **Spike first:** check that v2 needs the session manager started in the FastAPI lifespan. If it is fiddly, document `python -m hr_mcp.server --transport streamable-http` as the local option. |
 
@@ -186,6 +188,13 @@ Index layout: `app/data/index/<embedder>/{faiss.index, chunks.sqlite3, manifest.
 - **Confirm / Cancel** bar for a pending action.
 - A banner saying "Free tier: first request after idle may take ~60 s".
 - Built with escaped DOM and no `innerHTML` from model output.
+
+**As built (2026-10-26, commit `efedb73`):** endpoints `/`, `/chat`, `/chat/confirm`, `/health`, `/tools`, `/employees`, `/demo-tasks`. The UI has the picker, a 24-question library (clicking one switches the employee and asks it, showing the expected result), answer cards with sources and a collapsible tool trace, and Confirm/Cancel. Changing the picker starts a new session; a ticket is confirmed against the session that proposed it. The legacy app and `tests/test_mcp_tools.py` were replaced.
+
+**Remaining P4 work:**
+- `/mcp` HTTP mount (spike as described above) and `/eval/latest` (after P6).
+- Delete `app/legacy_rag.py`, `app/legacy_agent.py`, `app/mcp_server.py`, `app/data/employee_data.json` once P6 replaces `app/evaluation.py`, which still imports them.
+- UI polish from the demo: chat history across reloads is not kept (sessions are in memory); a "first request after idle may take ~60 s" banner for Render.
 
 **Tests** (`tests/test_app.py`, `TestClient` with lifespan):
 - `/health` returns ok with `mcp.connected` true (startup check).
