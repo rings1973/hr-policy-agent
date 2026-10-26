@@ -33,6 +33,9 @@ on the Groq free tier.
 | E-1004 (new hire) | Can I take 2 days off starting November 16? | Not allowed: the 90-day wait ends 2027-01-03 |
 | E-1005 | Can I take 3 days off starting November 16? | Not allowed: only 2 days available |
 | E-1002 | Can I take 3 days off next week? | Not allowed if fewer than 5 business days' notice |
+| E-1008 (intern) | How much PTO do I have? | 0 days: interns do not accrue PTO under the policy |
+| E-1008 (intern) | Can I take 2 days off starting November 16? | Not allowed: interns are not covered by the PTO policy; their agreement governs time off |
+| E-1008 (intern) | By December 15th 2027, how many PTO days will I have? | Stays at 0 (compare with E-1002's 19.17) |
 | E-1003 (contractor) | How much PTO do I have? | Contractors are not covered; their contract governs |
 | E-1006 (part-time) | What benefits am I enrolled in? | The employee's benefits record |
 | E-1007 | Can I expense a $280 chair for my home office? | Allowed: under the $300 limit |
