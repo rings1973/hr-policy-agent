@@ -24,8 +24,8 @@ from app.rag.loaders import load_documents
 
 EXPECTED_TOOLS = {
     "search_policy_documents", "get_policy_section", "list_policy_documents",
-    "lookup_employee_profile", "check_pto_balance", "lookup_benefits_status",
-    "check_policy_compliance", "draft_hr_email", "create_mock_hr_ticket",
+    "lookup_employee_profile", "check_pto_balance", "project_pto_balance",
+    "lookup_benefits_status", "check_policy_compliance", "draft_hr_email", "create_mock_hr_ticket",
 }
 
 
@@ -84,6 +84,16 @@ def test_data_tools_and_errors(server_params):
         email = await call(session, "draft_hr_email", recipient_id="M-42",
                            subject="PTO", body="Requesting 3 days.")
         assert email.structured_content["status"] == "draft_not_sent"
+        mine = await call(session, "draft_hr_email", recipient_id="manager", employee_id="E-1002",
+                          subject="PTO", body="Requesting 3 days.")
+        assert mine.structured_content["draft"]["to"]["id"] == "M-42"
+        orphan = await call(session, "draft_hr_email", recipient_id="MANAGER", subject="s",
+                            body="b")
+        assert orphan.is_error and "needs employee_id" in orphan.content[0].text
+
+        projection = await call(session, "project_pto_balance", employee_id="E-1002",
+                                target_date="2027-12-15")
+        assert projection.structured_content["projected_available"] == 19.17
     run(server_params, scenario)
 
 

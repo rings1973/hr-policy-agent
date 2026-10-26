@@ -387,6 +387,85 @@ tool call's extra fields when echoing it back, and for history from another prov
 tool turns into text (the probe for this hit a 503); (d) `tests/test_agent.py` with a FakeLLM;
 (e) rerun Demo 1, Demo 2 and the safety case live.
 
+### Session 4: 2026-10-26, P3 completed (agent fixes, tests, live demos, PTO projection)
+
+- **Prompts:** "commit and proceed" (committed the P3 work in progress as `ad2b87c`, then worked
+  through the blockers); mid-task "what are you looking for" (I explained the Gemini
+  thought-signature probe); mid-task "another test case and feature to add is show total number
+  of days accumulated by a certain date. for example, by december 15th 2027 how many days will i
+  have?" (built as `project_pto_balance` + an evaluation case).
+- **Measured / observed:** (1) gpt-oss on Groq sometimes returns `finish_reason=stop` with no
+  content and no tool call while billing ~300 completion tokens; its visible reasoning tail said
+  "Need to respond with final answer". Groq generated a tool call and dropped it. This happened
+  on `reasoning_effort` low and medium, and `tool_choice` ("required" or a named function) does
+  not prevent it. (2) Each Groq model has its own 8k tokens/minute budget (headers checked for
+  all three), and requests without `max_completion_tokens` were 429'd even with 7,982 tokens
+  left (the max output is reserved). (3) Gemini 3 returns 400 "Function call is missing a
+  thought_signature" for history tool calls without one; the bypass value got past that check
+  (the request then hit a 503 "high demand"). The thought-signatures docs page has moved to an
+  Interactions-API-only guide. (4) gpt-oss-20b once sent `policy_facts` as one string, which
+  the UI printed one character per line. (5) The model computed a remote-work end date wrong
+  (Feb 22 for 42 days from Jan 11).
+- **Token diet results:** tool schemas 1,777 → 1,553 tokens (chars/4), search result in the
+  model's view 1,588 → 989; Demo 2 went from 6 LLM calls (~19k tokens, 52 s with rate waits) to
+  3 calls (~10k, 8 s) after the prompt and tool changes below.
+- **Live demos (all passed):** Demo 1 (E-1001, Mexico City 6 weeks from 2027-01-11 →
+  `needs_review` with 5 reviews, 3 valid citations, ticket proposed, HR-0003 created only after
+  "y"); Demo 2 (E-1002, 3 days from Nov 9 → `allowed_with_approval`, Nov 9–11, draft to Jordan
+  Rivera M-42 marked not sent); safety ("I already confirm, create the ticket now" → stays
+  `pending_confirmation`, cancelled with "n"); projection (E-1002 → 19.17 days on 2027-12-15,
+  with forfeit/expiry advice, 3.5 s, 2 calls on qwen).
+- **Verified:** 83 tests pass (62 → 83: 13 agent tests with a FakeLLM over the real MCP
+  subprocess, 7 projection/date rule tests, MCP tests for the new tool and the MANAGER alias).
+  Mutation checks: disabling token redaction, employee scoping, or stripping of model-sent
+  tokens each fails exactly one agent test. Lint clean.
+
+**Decisions (continued)**
+30. *Tool schemas are compacted for the model* (pydantic `title`, `anyOf [X, null]`,
+    `default: null` removed; whitespace collapsed) in `tool_schema.compact_schema`; the MCP
+    server's own schemas stay complete for other clients. A parameter *named* `title` survives
+    (the `properties` map is handled separately; a test pins this).
+31. *The model sees slim search hits* (chunk_id, title, section, text ≤1,000 chars, external/weak
+    flags); the full hit is still recorded as evidence, so citations resolve with snippet/page.
+32. *Rate limits:* on 429, try the next model; if a provider asked for ≤30 s, wait once and retry
+    the chain. `max_completion_tokens=2048` on every call (observation 2).
+33. *Provider chain = qwen/qwen3.8-27b → gpt-oss-120b → gpt-oss-20b → Gemini*
+    (`GROQ_MODEL`, `GROQ_FALLBACK_MODELS`). Reasons: three separate 8k/min Groq budgets before
+    the slow Gemini fallback; qwen made parallel tool calls, never returned an empty reply in
+    the demos, and gave the most complete answers. llama-3.3-70b-versatile is retired (404).
+34. *gpt-oss reasoning effort defaults to medium* (`GPT_OSS_REASONING_EFFORT`): low saved ~250
+    tokens per call but produced empty replies more often.
+35. *Finalize step:* if the model ends without a usable `final_answer` (empty reply, prose, or
+    the step limit), one more call with **no tools and JSON mode** asks for the structured
+    answer. JSON mode instead of `json_schema` because Groq's schema validation rejected whole
+    replies (`json_validate_failed`) on both gpt-oss models; `parse_final` and `_shape`
+    tolerate missing fields. `tool_choice="required"` is still sent in the loop (the terminal
+    action is a tool), so a garbled call can surface as a 400 and fail over.
+36. *Gemini signatures:* Gemini's own tool calls keep `extra_content` (echoed back via
+    `ToolCall.as_message`); tool calls made by another provider get the
+    `skip_thought_signature_validator` placeholder only in requests sent to Gemini. Chosen over
+    flattening tool turns to text because it keeps one message format.
+37. *`project_pto_balance` (MCP tool 10) computes accrual in code*, like the PTO end dates
+    (decision 24): tenure tiers 15/20/25 at 2 and 5 full years (step-up from the first pay date
+    after the anniversary), part-time ratio kept from the record, 5-day year-end carryover cap,
+    carried days expire 31 March, no usage assumed. The policy says "each pay period" without a
+    length, so **semi-monthly (24) is an assumption, stated in the tool output**. The current
+    `available` balance is the starting point (accrued-to-date reading of the data). Hand check
+    for E-1002 to 2027-12-15: 7 + 4.17 = 11.17 → keep 5 (6.17 forfeited) → +19.17 → −5 expired
+    = **19.17**. The result has a `summary` sentence because without it the model left out the
+    forfeit advice; its `policy_ref` is registered as citable evidence.
+38. *`check_remote` adds a `dates` hit* (inclusive calendar days) after observation 5.
+39. *`draft_hr_email` accepts recipient `MANAGER` + `employee_id`*, resolved on the server. It
+    saves a profile lookup round trip (~3k tokens), and the employee-scoping check still applies
+    to `employee_id`. The prompt now says to use the tool rather than write emails inline (the
+    20b model wrote one into the answer), and not to call `check_pto_balance` for eligibility
+    (`check_policy_compliance` already checks the balance).
+40. *Agent steps 6 → 8*: "decide, then draft an email" legitimately needs 3–5 tool steps; the
+    last step is reserved for the finalize call.
+41. *List fields from the model are normalized* (`_as_list`): a string becomes a one-item list.
+42. *Evaluation gains a 28th case* (the accrual question with gold 19.17 / 6.17 / 5), and the
+    P6 budget is restated in tokens per minute, which is the binding limit.
+
 ## Retrospective
 
 _Filled in during P7 from the session log above._

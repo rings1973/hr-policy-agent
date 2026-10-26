@@ -21,6 +21,7 @@ PTO_SCOPE = "pto_policy#Purpose and Scope"
 PTO_ENTITLEMENT = "pto_policy#Annual PTO Entitlement"
 PTO_NOTICE = "pto_policy#Notice and Approval Requirements"
 PTO_COVERAGE = "pto_policy#Manager Review and Coverage"
+PTO_ACCRUAL = "pto_policy#Balance, Accrual, and Corrections"
 REMOTE_ELIGIBILITY = "remote_work_policy#Eligibility"
 REMOTE_RULE = "remote_work_policy#Decision Rule"
 REMOTE_DOCUMENTATION = "remote_work_policy#Documentation"
@@ -31,7 +32,8 @@ EXPENSE_APPROVAL = "expense_policy#Approval Before Purchase"
 EQUIPMENT_ISSUANCE = "equipment_policy#Issuance and Inventory"
 
 POLICY_REFS = (
-    PTO_SCOPE, PTO_ENTITLEMENT, PTO_NOTICE, PTO_COVERAGE, REMOTE_ELIGIBILITY, REMOTE_RULE,
+    PTO_SCOPE, PTO_ENTITLEMENT, PTO_NOTICE, PTO_COVERAGE, PTO_ACCRUAL, REMOTE_ELIGIBILITY,
+    REMOTE_RULE,
     REMOTE_DOCUMENTATION, REMOTE_DOMESTIC, REMOTE_SECURITY, EXPENSE_LIMITS, EXPENSE_APPROVAL,
     EQUIPMENT_ISSUANCE,
 )
@@ -48,6 +50,11 @@ PEOPLE_OPS = "People Operations"
 NOT_COVERED = {"contract": "Contractors", "intern": "Interns"}
 NEW_HIRE_WAIT_DAYS = 90
 PTO_NOTICE_DAYS, PTO_LONG_NOTICE_DAYS, PTO_LONG_REQUEST_DAYS = 5, 10, 3
+# Full-time annual PTO by full years of service, highest threshold first.
+PTO_TIERS = ((5, 25), (2, 20), (0, 15))
+PTO_CARRYOVER_MAX = 5
+CARRYOVER_EXPIRES = (3, 31)  # month, day
+PAY_PERIODS_PER_YEAR = 24  # the policy says "each pay period" without a length: semi-monthly
 REMOTE_NOTICE_DAYS = 10
 DOMESTIC_DAYS, INTERNATIONAL_TAX_DAYS, INTERNATIONAL_MAX_DAYS = 14, 30, 90
 
@@ -135,6 +142,98 @@ def last_business_day(start: date, days: float) -> date:
             if remaining == 0:
                 return current
         current += timedelta(days=1)
+
+
+def full_years(start: date, on: date) -> int:
+    return on.year - start.year - ((on.month, on.day) < (start.month, start.day))
+
+
+def tier_days(hire: date, on: date) -> int:
+    years = full_years(hire, on)
+    return next(days for min_years, days in PTO_TIERS if years >= min_years)
+
+
+def is_pay_date(day: date) -> bool:
+    """Semi-monthly pay dates: the 15th and the last day of each month."""
+    return day.day == 15 or (day + timedelta(days=1)).day == 1
+
+
+def project_pto(employee: dict[str, Any], balance: dict[str, Any], as_of: date,
+                target: date) -> dict[str, Any]:
+    """Estimate the PTO balance on `target`, assuming no PTO is used or requested after `as_of`.
+
+    The current `available` balance is the starting point. Each pay period adds the tenure tier
+    (scaled for part-time) / 24; on 31 Dec at most 5 days carry over and the rest is forfeited;
+    carried-over days not used by 31 Mar expire (with no usage assumed, all of them do).
+    """
+    out: dict[str, Any] = {"employee_id": employee["employee_id"], "as_of": as_of.isoformat(),
+                           "target_date": target.isoformat(), "unit": "days",
+                           "estimate": True, "policy_ref": PTO_ENTITLEMENT}
+    group = NOT_COVERED.get(employee["employment_type"])
+    if group:
+        return {**out, "accrues": False, "projected_available": balance["available"],
+                "detail": f"{group} do not accrue PTO under the policy; their agreement governs "
+                          "time off.", "policy_ref": PTO_SCOPE}
+    if target <= as_of:
+        return {**out, "accrues": True, "projected_available": balance["available"],
+                "detail": "Target date is not after the balance date; this is the current "
+                          "balance.", "events": []}
+
+    hire = date.fromisoformat(employee["hire_date"])
+    # Part-time entitlements are prorated: keep the record's ratio to the full-time tier.
+    fte = balance["annual_entitlement"] / tier_days(hire, as_of)
+    bal, carried, accrued, forfeited, expired = balance["available"], 0.0, 0.0, 0.0, 0.0
+    events: list[str] = []
+    rate_year = tier_days(hire, as_of)
+    day = as_of
+    while day < target:
+        day += timedelta(days=1)
+        if (day.month, day.day) == (1, 1):  # year end has passed
+            carried = min(bal, PTO_CARRYOVER_MAX)
+            if bal > carried:
+                forfeited += bal - carried
+                events.append(f"{day.year - 1}-12-31: {bal - carried:.2f} days over the "
+                              f"{PTO_CARRYOVER_MAX}-day carryover cap are forfeited; "
+                              f"{carried:.2f} carry over.")
+            bal = carried
+        if day == date(day.year, *CARRYOVER_EXPIRES) + timedelta(days=1) and carried:
+            expired, bal = expired + carried, bal - carried
+            events.append(f"{day.year}-03-31: {carried:.2f} carried-over days expire unless used "
+                          "by then.")
+            carried = 0.0
+        if is_pay_date(day):
+            tier = tier_days(hire, day)
+            if tier != rate_year:
+                years = full_years(hire, day)
+                anniversary = hire.replace(year=hire.year + years)
+                events.append(f"{anniversary.isoformat()}: {years} full years of service; "
+                              f"entitlement rises to {tier * fte:g} days/year from the "
+                              f"{day.isoformat()} pay date.")
+                rate_year = tier
+            step = tier * fte / PAY_PERIODS_PER_YEAR
+            bal, accrued = bal + step, accrued + step
+
+    eligible_from = hire + timedelta(days=NEW_HIRE_WAIT_DAYS)
+    summary = f"About {bal:.2f} days on {target.isoformat()} if no PTO is used before then."
+    if forfeited:
+        summary += (f" {forfeited:.2f} days would be lost to the {PTO_CARRYOVER_MAX}-day year-end "
+                    "carryover cap: use them before 31 December to keep them.")
+    if expired:
+        summary += f" {expired:.2f} carried-over days expire unless used by 31 March."
+    return {**out, "accrues": True, "summary": summary,
+            "current_available": balance["available"],
+            "accrued": round(accrued, 2),
+            "forfeited_over_cap": round(forfeited, 2),
+            "expired_carryover": round(expired, 2),
+            "projected_available": round(bal, 2),
+            "usable_on_target": target >= eligible_from,
+            "events": events,
+            "assumptions": [
+                "No PTO is used or requested after the balance date.",
+                (f"Accrual is paid semi-monthly ({PAY_PERIODS_PER_YEAR} pay periods a year) on "
+                 "the 15th and last day of the month; the policy does not state the pay period."),
+                "Unused carried-over days expire on 31 March.",
+                "The HR system is the authoritative balance; this is an estimate."]}
 
 
 def _not_covered(decision: Decision, employee: dict[str, Any], policy_ref: str, what: str) -> bool:
@@ -276,6 +375,10 @@ def check_remote(employee: dict[str, Any], days: int | None, destination_state: 
         result: Result = "pass" if given >= REMOTE_NOTICE_DAYS else "fail"
         d.hit("notice", result, f"Requests need {REMOTE_NOTICE_DAYS} business days' notice; "
               f"starting {start_date.isoformat()} gives {given}.", REMOTE_DOCUMENTATION)
+        # Calendar days, inclusive: the model wrote Feb 22 for 42 days from Jan 11 (it's Feb 21).
+        end = start_date + timedelta(days=days - 1)
+        d.hit("dates", "info", f"{days} calendar days from {start_date.isoformat()} "
+              f"({start_date:%A}) end on {end.isoformat()} ({end:%A}).", REMOTE_RULE)
     return d.finish()
 
 

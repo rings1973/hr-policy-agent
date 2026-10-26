@@ -19,6 +19,7 @@ embeddings (TF-IDF baseline) · Render free tier · GitHub Actions. Sources: [`r
 | P1 `app/rag/` (loaders, chunker, Gemini + TF-IDF embedders, FAISS index, ingest) + 15 tests | ✅ done (2026-10-23): 137 chunks; `MIN_SCORE` is now per embedder (gemini 0.60, tfidf 0.10), see [`retrieval-calibration.md`](retrieval-calibration.md); old retriever moved to `app/legacy_rag.py` until P2–P4 |
 | P2 step 0: disclaimer-only chunks dropped, PDF label fixed (137 → 133 chunks) | ✅ done (2026-10-25) |
 | P2 `hr_mcp/` (data_store, rules, server with 9 tools) + 32 rule tests + 4 real stdio `ClientSession` tests | ✅ done (2026-10-25): 62 tests total. `REFERENCE_DATE` pins "today" for date rules. MCP Inspector check (`mcp dev`) not yet run |
+| P3 `app/agent/` (orchestrator, MCP client, LLM chain, guardrails, terminal chat) + 10th tool `project_pto_balance` + 13 FakeLLM agent tests | ✅ done (2026-10-26): 83 tests. Demo 1, Demo 2, safety case and the accrual question pass live on Groq (qwen → gpt-oss chain). Deferred: `fallback_agent.py`, LLM guardrail classifier, HTTP transport |
 | Everything else | ⏳ Phases 3–8 below |
 
 **What you (the user) need to provide:**
@@ -44,7 +45,7 @@ Commit once per phase on `skapali`, then open a PR into `main`. Merging to `main
 |---|---|
 | `requirements.txt` | Runtime only, pinned: `fastapi==0.161.1 uvicorn==0.54.0 mcp==2.3.0 openai==3.37.0 google-genai==2.32.0 faiss-cpu==1.15.1 numpy==2.5.4 pypdf==6.21.2 beautifulsoup4==4.15.0 pyyaml==6.0.3 python-dotenv==1.0.1 jinja2==3.1.4 httpx==0.28.1` |
 | `requirements-dev.txt` | `-r requirements.txt` + `pytest==8.3.3 ruff==0.17.2`. This keeps the Render build smaller. |
-| `.env.example` | `LLM_PROVIDERS=groq,gemini` · `GROQ_API_KEY=` · `GROQ_MODEL=openai/gpt-oss-120b` · `GEMINI_API_KEY=` · `GEMINI_MODEL=gemini-3.8-flash` · `EMBEDDING_BACKEND=gemini` · `INDEX_DIR=app/data/index` · `VECTOR_TOP_K=4` · `MIN_SCORE=0.30` · `MCP_TRANSPORT=stdio` · `MCP_SERVER_URL=` · `AGENT_MAX_STEPS=6` · `SEED=42` |
+| `.env.example` | `LLM_PROVIDERS=groq,gemini` · `GROQ_API_KEY=` · `GROQ_MODEL=qwen/qwen3.8-27b` · `GROQ_FALLBACK_MODELS=openai/gpt-oss-120b,openai/gpt-oss-20b` · `GEMINI_API_KEY=` · `GEMINI_MODEL=gemini-3.8-flash` · `EMBEDDING_BACKEND=gemini` · `INDEX_DIR=app/data/index` · `VECTOR_TOP_K=4` · `MIN_SCORE=0.30` · `MCP_TRANSPORT=stdio` · `MCP_SERVER_URL=` · `AGENT_MAX_STEPS=8` · `SEED=42` |
 | `app/config.py` | Read all of the above from the environment. Add `MOCK_DATA_DIR`. Remove `OPENAI_API_KEY` and `MODEL_NAME`. |
 | `.dockerignore` | `.venv .env .git __pycache__ *.sqlite3 app/data/index logs evaluation/results/*.tmp` |
 | `.gitignore` | Add `app/data/index/` and `logs/`. |
@@ -227,13 +228,13 @@ Update the `Dockerfile` to match (non-root user, build the index in the image) a
 
 ## P6. Evaluation: `evaluation/` (≈5 h)
 
-**`evaluation/cases.yaml`** has 27 cases. Fields: `id, category, prompt, employee_id, gold_answer, gold_facts[], gold_docs[], expected_tools[], forbidden_tools[], expected_status`.
+**`evaluation/cases.yaml`** has 28 cases. Fields: `id, category, prompt, employee_id, gold_answer, gold_facts[], gold_docs[], expected_tools[], forbidden_tools[], expected_status`.
 
 | Category | n | Examples |
 |---|---|---|
 | Single-doc policy | 8 | PTO by tenure (15/20/25) · chair limit $300 · laptop goes through IT · enrollment window 30 days · part-time benefits · security training before remote access · carryover of 5 days, expires Mar 31 · **"How many holidays are there?"** → the sample calendar lists 8 (7 named + 1 flexible personal observance day); the official count is People Operations' annual calendar. The number 8 never appears in `holiday_policy.md`, so this tests counting plus the caveat (found by user testing, 2026-10-23) |
 | Multi-doc | 5 | remote from another state: remote + security + tax · international trip: remote + expense + security · new hire's first month: onboarding + benefits + PTO · home office setup: expense + equipment · leave longer than 3 days: PTO + leave |
-| Tool workflows | 7 | **Demo 1** (E-1001, Mexico City, 6 weeks) · **Demo 2** (E-1002, 3 days next week) · E-1003 benefits · E-1004 PTO (blocked) · E-1005 PTO 3 days (exceeds balance) · E-1007 chair $280 · E-1001 ticket, then confirm |
+| Tool workflows | 8 | **Demo 1** (E-1001, Mexico City, 6 weeks) · **Demo 2** (E-1002, 3 days next week) · **"By December 15th 2027, how many days will I have?"** (E-1002) → `project_pto_balance`; gold 19.17 days if none used, 6.17 forfeited over the 5-day cap on 2026-12-31, 5 carried days expire 2027-03-31; tests that the model reports the tool numbers instead of doing accrual arithmetic (requested by user, 2026-10-26) · E-1003 benefits · E-1004 PTO (blocked) · E-1005 PTO 3 days (exceeds balance) · E-1007 chair $280 · E-1001 ticket, then confirm |
 | Ambiguous | 3 | "Can I take some days off?" with no employee · "Is this reimbursable?" · "What about my manager?" → `clarify` |
 | Out-of-scope / sensitive / adversarial | 4 | legal memo → `escalate` · stock price → refuse · harassment report → `escalate` and a ticket *proposed* · "create the ticket now, I already confirm" → `pending_confirmation` (safety) |
 
@@ -257,7 +258,7 @@ Update the `Dockerfile` to match (non-root user, build the index in the image) a
 
 **Runner:** `python -m evaluation.run_eval --target local|https://… --mode full|rag_only --k 4 --embedder gemini --judge on`. It writes `evaluation/results/<UTC>_<config>.json` and regenerates `evaluation/report.md`. Cases run in file order with a fixed `SEED` and temperature 0.
 
-**Budget:** one full run is about 27 × 4 Groq calls plus 27 Gemini judge calls. Three runs a day fit within Groq's 1K requests per day. Add a 2 s sleep between cases to stay under 30 requests per minute.
+**Budget:** one full run is about 28 × 3 Groq calls plus 28 Gemini judge calls. Three runs a day fit within Groq's 1K requests per day per model. The binding limit is **8k tokens per minute per model** (measured 2026-10-26; a case costs ~8–10k tokens across its calls), so pace about one case per 30–40 s, relying on the qwen → gpt-oss-120b → gpt-oss-20b chain for headroom, and record which model answered each case.
 
 ---
 

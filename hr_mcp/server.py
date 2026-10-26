@@ -1,4 +1,4 @@
-"""MCP server for the HR policy agent: 9 tools over policy retrieval, mock HR data, rule checks
+"""MCP server for the HR policy agent: 10 tools over policy retrieval, mock HR data, rule checks
 and mock actions.
 
     python -m hr_mcp.server                              stdio (launched by the agent)
@@ -160,6 +160,24 @@ def check_pto_balance(employee_id: EmployeeId) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=READ_ONLY)
+def project_pto_balance(
+    employee_id: EmployeeId,
+    target_date: Annotated[str, Field(description="Future date, YYYY-MM-DD.")],
+) -> dict[str, Any]:
+    """Estimate how many PTO days an employee will have on a future date if no more PTO is used:
+    accrual per pay period by tenure tier, the 5-day year-end carryover cap and the 31 March
+    expiry of carried-over days. Returns projected_available, the days forfeited or expired on
+    the way, dated events and the assumptions. Use it instead of calculating accrual yourself."""
+    target = parse_date(target_date, "target_date")
+    with tool_errors():
+        employee, balance = store().employee(employee_id), store().pto(employee_id)
+    as_of = date.fromisoformat(store().as_of)
+    if target.year > as_of.year + 5:
+        raise ToolError("target_date must be within 5 years of the balance date.")
+    return rules.project_pto(employee, balance, as_of, target)
+
+
+@mcp.tool(annotations=READ_ONLY)
 def lookup_benefits_status(employee_id: EmployeeId) -> dict[str, Any]:
     """Benefits enrollment: status (active, pending, not_eligible), medical/dental/vision
     elections, 401(k) contribution and any enrollment deadline."""
@@ -208,13 +226,20 @@ def check_policy_compliance(
 @mcp.tool(annotations=MOCK_ACTION)
 def draft_hr_email(
     recipient_id: Annotated[str, Field(
-        description="Employee id, manager id (e.g. M-42) or PEOPLE-OPS.")],
+        description="MANAGER (the employee's own manager), an employee id, a manager id "
+                    "(e.g. M-42) or PEOPLE-OPS.")],
     subject: str,
     body: str,
+    employee_id: Annotated[str | None, Field(
+        description="The employee writing; required when recipient_id is MANAGER.")] = None,
 ) -> dict[str, Any]:
     """Draft an email to a manager, employee or People Operations for the user to review. It is
     never sent: the result has status draft_not_sent."""
     with tool_errors():
+        if recipient_id.strip().upper() == "MANAGER":
+            if not employee_id:
+                raise ToolError("recipient_id MANAGER needs employee_id.")
+            recipient_id = store().employee(employee_id)["manager_id"]
         recipient = store().recipient(recipient_id)
     return {"status": "draft_not_sent",
             "draft": {"to": recipient, "subject": subject, "body": body}}

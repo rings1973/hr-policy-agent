@@ -141,3 +141,50 @@ def test_confirmation_tokens_are_single_use_bound_and_expiring():
     with pytest.raises(ValueError, match="expired"):
         store.confirm(late, "ticket", payload)
     assert store.add_ticket(payload)["ticket_id"] == "HR-0003"  # after the 2 seed tickets
+
+
+def projection(store, eid, target):
+    return rules.project_pto(store.employee(eid), store.pto(eid), TODAY, date.fromisoformat(target))
+
+
+def test_projection_e1002_hand_checked(store):
+    # 7 now + 5 pay dates left in 2026 at 20/24 = 11.17; Dec 31 keeps 5 (6.17 forfeited);
+    # 23 pay dates in 2027 to Dec 15 add 19.17; the 5 carried days expired on Mar 31.
+    p = projection(store, "E-1002", "2027-12-15")
+    assert p["projected_available"] == 19.17
+    assert p["forfeited_over_cap"] == 6.17 and p["expired_carryover"] == 5
+    assert p["accrued"] == 23.33 and p["estimate"] is True
+
+
+def test_projection_applies_tenure_step_up_mid_year(store):
+    p = projection(store, "E-1007", "2027-12-15")  # hired 2022-09-19: 5 years on 2027-09-19
+    assert any(e.startswith("2027-09-19: 5 full years") for e in p["events"])
+    flat = 20 / 24 * 23 + 20 / 24 * 5          # what 20 days/year alone would accrue
+    assert p["accrued"] > round(flat, 2)
+
+
+def test_projection_within_the_year_has_no_carryover_effects(store):
+    p = projection(store, "E-1002", "2026-12-15")  # Oct 31, Nov 15, Nov 30, Dec 15
+    assert p["projected_available"] == round(7 + 4 * 20 / 24, 2)
+    assert p["events"] == []
+
+
+def test_projection_part_time_keeps_prorated_rate(store):
+    p = projection(store, "E-1006", "2026-11-30")  # 12 days/year: 0.5 per pay date, 3 dates
+    assert p["projected_available"] == 5.5 + 1.5
+
+
+def test_projection_contractor_and_past_dates(store):
+    assert projection(store, "E-1003", "2027-12-15")["accrues"] is False
+    assert projection(store, "E-1002", "2026-01-01")["projected_available"] == 7
+
+
+def test_projection_new_hire_usable_flag(store):
+    assert projection(store, "E-1004", "2026-12-15")["usable_on_target"] is False
+    assert projection(store, "E-1004", "2027-01-15")["usable_on_target"] is True
+
+
+def test_remote_dates_are_computed_not_left_to_the_model(store):
+    d = remote(store, "E-1001", 42, country="Mexico", start="2027-01-11")
+    detail = next(h.detail for h in d.rule_hits if h.rule == "dates")
+    assert "end on 2027-02-21 (Sunday)" in detail
