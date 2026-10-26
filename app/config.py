@@ -28,6 +28,9 @@ GROQ_FALLBACK_MODELS = [m.strip() for m in os.getenv(
     "GROQ_FALLBACK_MODELS", "openai/gpt-oss-120b,openai/gpt-oss-20b").split(",") if m.strip()]
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or None
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+# Evaluation judge. Free-tier quotas are per model (gemini-3.8-flash: 20 requests/day), so the
+# judge uses a different model and leaves GEMINI_MODEL's quota to the agent's fallback.
+JUDGE_MODEL = os.getenv("JUDGE_MODEL", "gemini-3.5-flash-lite")
 # low | medium | high, or empty for the provider default. Hidden reasoning counts toward
 # Groq's per-minute token limit, but "low" was seen to end turns with no output (2026-10-26).
 GPT_OSS_REASONING_EFFORT = os.getenv("GPT_OSS_REASONING_EFFORT", "medium") or None
@@ -53,5 +56,3 @@ REFERENCE_DATE = os.getenv("REFERENCE_DATE") or None
 DATA_DIR = BASE_DIR / "app" / "data"
 POLICY_DIR = DATA_DIR / "policies"
 MOCK_DATA_DIR = _path("MOCK_DATA_DIR", "mock_data")
-# Legacy single-file data used by app/legacy_rag.py until P1/P2 move it onto MOCK_DATA_DIR.
-EMPLOYEE_FILE = DATA_DIR / "employee_data.json"

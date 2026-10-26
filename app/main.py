@@ -9,6 +9,7 @@ both live for the whole app. If startup fails the app still serves, with /health
 
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -21,10 +22,24 @@ from pydantic import BaseModel, Field
 
 from app import config, demo_questions
 from app.agent import AgentResult, HRAgent, LLMClient, MCPToolClient, SessionStore
+from evaluation import report
 from hr_mcp.data_store import HRDataStore
 
 STATIC_DIR = config.BASE_DIR / "app" / "static"
-VERSION = "0.4.0"
+RESULTS_DIR = config.BASE_DIR / "evaluation" / "results"
+VERSION = "0.5.0"
+
+
+def index_info() -> dict[str, Any]:
+    """What the MCP server's index was built with, read from its manifest (the server falls back
+    to tfidf the same way when the preferred index is missing)."""
+    for name in dict.fromkeys([config.EMBEDDING_BACKEND, "tfidf"]):
+        path = config.INDEX_DIR / name / "manifest.json"
+        if path.exists():
+            m = json.loads(path.read_text(encoding="utf-8"))
+            return {"embedder": m["embedder"], "model": m["model"], "chunks": m["chunks"],
+                    "documents": m["documents"], "built_at": m.get("built_at")}
+    return {"error": f"no index under {config.INDEX_DIR}"}
 
 
 @dataclass
@@ -114,7 +129,7 @@ async def health(request: Request) -> dict[str, Any]:
     providers = [f"{p.name}/{p.model}" for p in state.llm.providers] if state.llm else []
     ok = mcp["connected"] and bool(providers)
     return {"status": "ok" if ok else "degraded", "version": VERSION, "mcp": mcp,
-            "llm": {"providers_configured": providers},
+            "llm": {"providers_configured": providers}, "index": index_info(),
             **({"error": state.startup_error} if state.startup_error else {})}
 
 
@@ -139,6 +154,12 @@ def employees() -> dict[str, Any]:
 @app.get("/demo-tasks")
 def demo_tasks() -> dict[str, Any]:
     return {"groups": demo_questions.as_dict()}
+
+
+@app.get("/eval/latest")
+def eval_latest() -> dict[str, Any]:
+    """Headline numbers from the newest committed evaluation results (no per-case transcripts)."""
+    return report.latest_summary(RESULTS_DIR)
 
 
 @app.get("/")

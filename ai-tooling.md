@@ -483,6 +483,45 @@ tool turns into text (the probe for this hit a 503); (d) `tests/test_agent.py` w
     FakeLLM (6 tests). Deferred P4 items: `/mcp` HTTP mount, `/eval/latest`, deleting the legacy
     modules.
 
+### Session 4b: 2026-10-26, groundwork for P4–P7
+
+- **Prompt:** "proceed and have other things ready so we can accelerate P4-P7. any actions I can
+  take?"
+- **Actions:** P5 CI smoke test and gated deploy job, `render.yaml`, `Dockerfile`; P6
+  `evaluation/` package (28 cases, metrics, judge, runner, report, latency probe) with 9 tests;
+  P4 `/eval/latest`, index info in `/health`, legacy modules deleted; P7 README rewrite and drafts
+  of `design-and-evaluation.md` and `deployed.md`.
+- **Measured:** retrieval ablation over the 23 cases with gold documents: Gemini hit@2 1.00,
+  recall@4 0.95, MRR 0.98; TF-IDF hit@4 0.96, recall@8 1.00. Two live agent cases (W03, X02)
+  passed through the runner. The judge hit Gemini 3.8 Flash's free-tier caps: 5 requests/minute
+  and **20 requests/day per model** (429 "generate_content_free_tier_requests, limit: 20").
+- **Verified:** 90 tests pass (−2 legacy evaluation tests, +1 app test, +9 evaluation tests);
+  lint clean; `/health` and `/eval/latest` checked on the running server.
+
+**Decisions (continued)**
+46. *Deploy only through CI:* `render.yaml` sets `autoDeployTrigger: off`; the `deploy` job runs
+    only on pushes to `main` with `needs: test`, calls the deploy-hook secret, then polls the
+    app's `/health` (URL in the `RENDER_APP_URL` repository variable) until `mcp.connected`.
+    The test job also starts uvicorn and requires `/health` to show the MCP server connected.
+47. *The Render build makes both indexes* (`--embedder all`), so a Gemini embedding failure at
+    build time still leaves the TF-IDF index that `open_index` falls back to.
+48. *Evaluation cases have `optional_tools` and a list of allowed statuses.* Tool precision
+    should not punish a reasonable extra lookup (e.g. a profile check before a remote-work
+    decision), and some prompts can correctly end as `ok` or `clarify`.
+49. *Judge = `gemini-3.5-flash-lite` (`JUDGE_MODEL`), separate from the generator's Gemini
+    model:* the free tier counts quota per model, so judging 28 cases on `gemini-3.8-flash` would
+    use up the agent's last-resort fallback for the day. A direct test confirmed the lite model
+    flags an invented claim (groundedness 0.5) and scores gold facts. `--rejudge` re-scores a
+    saved run so an agent run and its judging can happen on different days.
+50. *Lexical fallbacks are always computed* alongside the judge (`must_mention` coverage and
+    sentence-overlap groundedness), so a run without the judge still has numbers and the judge
+    can be checked against them.
+51. *Retrieval ablation runs in CI* on the TF-IDF index (no key needed), with a test that holds
+    hit@4 at 0.7 or above as a regression guard.
+52. *Legacy modules deleted* (`app/evaluation.py`, `legacy_agent.py`, `legacy_rag.py`,
+    `mcp_server.py`, `app/data/employee_data.json`, `config.EMPLOYEE_FILE`) now that
+    `evaluation/` replaces the last importer.
+
 ## Retrospective
 
 _Filled in during P7 from the session log above._

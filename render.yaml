@@ -1,10 +1,22 @@
+# Render Blueprint. Deploys come only from the CI deploy job (deploy hook), after tests pass.
 services:
   - type: web
     name: hr-policy-agent
     runtime: python
     plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port 10000"
+    autoDeployTrigger: "off"
+    healthCheckPath: /health
+    # Builds both indexes: gemini (if the key works) and the keyless tfidf fallback.
+    buildCommand: "pip install -r requirements.txt && python -m app.rag.ingest --embedder all"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION
-        value: "3.13"
+        value: "3.13.11"
+      - key: EMBEDDING_BACKEND
+        value: gemini
+      - key: APP_ENV
+        value: production
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

@@ -20,14 +20,19 @@ embeddings (TF-IDF baseline) · Render free tier · GitHub Actions. Sources: [`r
 | P2 step 0: disclaimer-only chunks dropped, PDF label fixed (137 → 133 chunks) | ✅ done (2026-10-25) |
 | P2 `hr_mcp/` (data_store, rules, server with 9 tools) + 32 rule tests + 4 real stdio `ClientSession` tests | ✅ done (2026-10-25): 62 tests total. `REFERENCE_DATE` pins "today" for date rules. MCP Inspector check (`mcp dev`) not yet run |
 | P3 `app/agent/` (orchestrator, MCP client, LLM chain, guardrails, terminal chat) + 10th tool `project_pto_balance` + 13 FakeLLM agent tests | ✅ done (2026-10-26): 83 tests. Demo 1, Demo 2, safety case and the accrual question pass live on Groq (qwen → gpt-oss chain). Deferred: `fallback_agent.py`, LLM guardrail classifier, HTTP transport |
-| P4 web app (pulled forward for the demo): `app/main.py` + `app/static/index.html`, question library (`app/demo_questions.py`, `docs/demo-questions.md`), 6 app tests | 🔶 mostly done (2026-10-26): 82 tests. Not yet: `/mcp` HTTP mount, `/eval/latest`, deleting legacy modules |
+| P4 web app (pulled forward for the demo): `app/main.py` + `app/static/index.html`, question library (`app/demo_questions.py`, `docs/demo-questions.md`), app tests | ✅ done (2026-10-26) except the optional `/mcp` HTTP mount: `/eval/latest`, index info in `/health`, legacy modules deleted |
+| P5 CI/CD: smoke test of the running app, retrieval ablation in CI, gated `deploy` job, `render.yaml` (auto-deploy off, both indexes), non-root `Dockerfile` | 🔶 code ready (2026-10-26); needs the Render service, the deploy-hook secret and a first merge to `main` |
+| P6 `evaluation/`: 28 cases, metrics, Gemini judge (`gemini-3.5-flash-lite`), runner with `--mode rag_only`, `--retrieval-only`, `--rejudge`, report, latency probe; 9 tests (90 total) | 🔶 harness ready; retrieval ablation measured. Not yet: the full 28-case run, the rag_only run, the cold-start probe |
+| P7 docs | 🔶 README rewritten; `design-and-evaluation.md` and `deployed.md` drafted with _TODO_ markers for the numbers; retrospective in `ai-tooling.md` still to write |
 | Teammate progress demo (2026-10-27) | Web app run locally (`uvicorn app.main:app`), 4 demo tasks from the question library; terminal chat as backup |
-| Everything else | ⏳ P4 remainder, then P5–P8 below. Order after the demo: merge decision with the teammate → P5 deploy → P6 evaluation → P7 docs → P8 video |
+| Everything else | ⏳ Merge decision with the teammate → deploy (P5/P8) → full eval runs (P6) → fill the doc TODOs (P7) → video (P8) |
 
 **What you (the user) need to provide:**
-1. A Groq API key (console.groq.com) and a Gemini API key (aistudio.google.com) in a local `.env`. Never commit it.
-2. A Render account connected to the GitHub repo, plus the deploy hook URL saved as the GitHub secret `RENDER_DEPLOY_HOOK_URL`.
+1. A Groq API key (console.groq.com) and a Gemini API key (aistudio.google.com) in a local `.env`. Never commit it. ✅
+2. A Render account connected to the GitHub repo: create the web service from `render.yaml` (Blueprint), set `GROQ_API_KEY` and `GEMINI_API_KEY` in its dashboard, then save the deploy hook URL as the GitHub secret `RENDER_DEPLOY_HOOK_URL` and the app URL as the repository variable `RENDER_APP_URL`.
 3. Share the repo with `quantic-grader`, and record the demo video (all members on camera, government ID shown).
+
+**Free-tier budget found on 2026-10-26:** Gemini 3.8 Flash allows 5 requests/minute and 20/day per model; Groq allows ~8k tokens/minute per model. So run the full evaluation on a day without demos, judge it with the separate lite model, and do not run it the day before a recording.
 
 ---
 
@@ -191,9 +196,8 @@ Index layout: `app/data/index/<embedder>/{faiss.index, chunks.sqlite3, manifest.
 
 **As built (2026-10-26, commit `efedb73`):** endpoints `/`, `/chat`, `/chat/confirm`, `/health`, `/tools`, `/employees`, `/demo-tasks`. The UI has the picker, a 24-question library (clicking one switches the employee and asks it, showing the expected result), answer cards with sources and a collapsible tool trace, and Confirm/Cancel. Changing the picker starts a new session; a ticket is confirmed against the session that proposed it. The legacy app and `tests/test_mcp_tools.py` were replaced.
 
-**Remaining P4 work:**
-- `/mcp` HTTP mount (spike as described above) and `/eval/latest` (after P6).
-- Delete `app/legacy_rag.py`, `app/legacy_agent.py`, `app/mcp_server.py`, `app/data/employee_data.json` once P6 replaces `app/evaluation.py`, which still imports them.
+**Remaining P4 work** (`/eval/latest` and the legacy deletion were done on 2026-10-26):
+- Optional `/mcp` HTTP mount (spike as described above).
 - UI polish from the demo: chat history across reloads is not kept (sessions are in memory); a "first request after idle may take ~60 s" banner for Render.
 
 **Tests** (`tests/test_app.py`, `TestClient` with lifespan):

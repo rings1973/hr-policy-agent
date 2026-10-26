@@ -8,7 +8,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import POLICY_DIR
-from app.evaluation import EVALUATION_CASES, run_evaluation
 from app.main import app
 from app.rag.chunker import chunk_documents
 from app.rag.embeddings import TfidfEmbedder
@@ -26,6 +25,8 @@ def client(tmp_path_factory):
     for key, value in {"INDEX_DIR": str(base), "EMBEDDING_BACKEND": "tfidf",
                        "REFERENCE_DATE": "2026-10-22", "MIN_SCORE": ""}.items():
         mp.setenv(key, value)
+    mp.setattr("app.config.INDEX_DIR", base)  # read in-process by /health's index info
+    mp.setattr("app.config.EMBEDDING_BACKEND", "tfidf")
     with TestClient(app) as test_client:
         yield test_client
     mp.undo()
@@ -93,13 +94,7 @@ def test_out_of_scope_needs_no_model(client):
     assert body["status"] == "escalate"
 
 
-# Legacy evaluation runner (app/evaluation.py) until P6 replaces it.
-def test_evaluation_dataset_has_required_size():
-    assert len(EVALUATION_CASES) >= 20
-
-
-def test_evaluation_runner_returns_summary():
-    summary = run_evaluation()
-    assert summary["total"] >= 20
-    assert "by_category" in summary
-    assert summary["latency_ms"]["p95"] >= summary["latency_ms"]["p50"] >= 0
+def test_health_and_eval_endpoints_report_build_info(client):
+    index = client.get("/health").json()["index"]
+    assert index["embedder"] == "tfidf" and index["chunks"] > 0
+    assert isinstance(client.get("/eval/latest").json(), dict)

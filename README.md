@@ -1,80 +1,124 @@
 # HR Policy Agent
 
-A small, deployable HR policy assistant built as a FastAPI application. The project combines a synthetic policy corpus, local sparse-vector retrieval, structured employee data, and an MCP-compatible tool layer for a realistic HR support workflow.
+An HR policy assistant for a fictional company. It answers policy questions with citations from a
+12-document corpus (RAG), checks the user's own records and eligibility through 10 tools on a
+real MCP server, drafts emails, and proposes HR tickets that are created only after the user
+clicks Confirm. Built for Quantic MSAIE Project 3.
 
-## Features
-- FastAPI chat API with `/chat`, `/health`, `/evaluate`, and `/demo-tasks` endpoints
-- Ten synthetic policy sources in Markdown and TXT, approximately 46 standard 250-word pages across PTO, holidays, remote work, expenses, data security, benefits, onboarding, equipment, leave, and workplace conduct
-- Heading-aware ingestion with local TF-IDF sparse vectors persisted alongside chunk metadata in SQLite (a lightweight baseline, not a pretrained semantic embedding model)
-- MCP-compatible stateless HTTP endpoint at `/mcp` for tool discovery and calls, plus policy search, employee lookup, PTO, benefits, and mock HR actions
-- Agent orchestration for remote-work and PTO workflows
-- Smoke tests and CI workflow for startup and tool validation
-- Render-ready single-service deployment configuration for free-tier hosting
+- **Deployed app:** _TBD after P8_ (see [deployed.md](deployed.md))
+- **Design and evaluation:** [design-and-evaluation.md](design-and-evaluation.md)
+- **Evaluation report:** [evaluation/report.md](evaluation/report.md)
+- **How AI tools were used:** [ai-tooling.md](ai-tooling.md)
 
-## Project structure
-- `app/main.py` – FastAPI app and endpoints
-- `app/agent.py` – orchestration for tool selection and answer synthesis
-- `app/mcp_server.py` – MCP-style tool definitions and execution layer
-- `app/rag.py` – markdown ingestion and retrieval logic
-- `app/data/` – synthetic employee data and policy corpus
-- `tests/` – pytest smoke and MCP validation tests
+All policies and employee records are synthetic and AI-assisted, written for this project. They
+describe no real employer or person. Two public-domain US government documents (NIST SP 800-46r2
+excerpt, OPM annual leave fact sheet) are included as external references; see
+[app/data/policies/SOURCES.md](app/data/policies/SOURCES.md).
 
-## Local setup
+## Architecture
+
+```mermaid
+flowchart LR
+    UI["Browser UI<br/>app/static/index.html"] -->|POST /chat, /chat/confirm| API["FastAPI<br/>app/main.py"]
+    API --> AG["Agent orchestrator<br/>app/agent/"]
+    AG -->|tool calls, JSON| LLM["LLM chain<br/>Groq qwen3.8-27b → gpt-oss-120b<br/>→ gpt-oss-20b → Gemini"]
+    AG -->|MCP over stdio| MCP["MCP server<br/>hr_mcp/server.py (10 tools)"]
+    MCP --> IDX["FAISS index + SQLite chunks<br/>app/rag/"]
+    MCP --> DATA["Mock HR data<br/>mock_data/*.json"]
+```
+
+The orchestrator is a hand-written tool-calling loop (no agent framework). Guardrails run before
+the model (out-of-scope, emergency, legal and sensitive topics) and after it (citations must come
+from this turn's tool results; employee tools only accept the employee picked in the UI). Dates and
+PTO arithmetic are computed by the rules engine in `hr_mcp/rules.py`, not by the model.
+
+## Run locally
+
+Requires Python 3.13.
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+.venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
+pip install -r requirements-dev.txt
+copy .env.example .env            # then add GROQ_API_KEY and GEMINI_API_KEY (both free tiers)
+python -m app.rag.ingest --embedder all    # builds app/data/index/{gemini,tfidf}
+uvicorn app.main:app --reload     # http://127.0.0.1:8000
 ```
 
-Then open `http://localhost:8000/` to test the chat UI.
+Without any key the app still starts: `/health` reports `degraded` and retrieval uses the keyless
+TF-IDF index. There is also a terminal chat: `python -m app.agent.chat --employee E-1002`.
 
-## Example tasks
-1. Remote work eligibility: "Can Ava work remotely from another state for six weeks?"
-2. PTO guidance: "What is the current PTO balance and what steps are required for a planned PTO request?"
+### Environment variables
 
-## Architecture summary
+| Variable | Default | Purpose |
+|---|---|---|
+| `GROQ_API_KEY` | (none) | Main LLM provider (free tier) |
+| `GROQ_MODEL` | `qwen/qwen3.8-27b` | First model tried |
+| `GROQ_FALLBACK_MODELS` | `openai/gpt-oss-120b,openai/gpt-oss-20b` | Each Groq model has its own per-minute token budget |
+| `GEMINI_API_KEY` | (none) | Embeddings, last-resort LLM, evaluation judge |
+| `GEMINI_MODEL` | `gemini-3.8-flash` | Last-resort LLM |
+| `JUDGE_MODEL` | `gemini-3.5-flash-lite` | Evaluation judge (separate free-tier quota) |
+| `EMBEDDING_BACKEND` | `gemini` | `gemini` or `tfidf`; falls back to `tfidf` if the Gemini index is unusable |
+| `INDEX_DIR` | `app/data/index` | Where `app.rag.ingest` writes the indexes |
+| `VECTOR_TOP_K` | `4` | Chunks returned per search |
+| `AGENT_MAX_STEPS` | `8` | Model calls per turn, including the final answer |
+| `REFERENCE_DATE` | today | Pin "today" (YYYY-MM-DD) for reproducible date rules |
+| `SEED` | `42` | Sent to Groq for repeatable sampling |
+| `MOCK_DATA_DIR` | `mock_data` | Synthetic employee, PTO, benefits and ticket data |
 
-```text
-Browser / UI
-   |
-   v
-FastAPI app (/chat, /health)
-   |
-   +--> HR Policy Agent
-   |      +--> MCP Tool Server
-   |      |      +--> Policy RAG index
-   |      |      +--> Employee records (JSON)
-   |      |      +--> Mock ticket/email operations
-   |      |
-   |      +--> Final answer + citations + tool trace
+## Endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /` | Chat UI with an "Acting as" picker and a 27-question library |
+| `POST /chat` | `{message, session_id?, employee_id?}` → answer, facts, recommendations, citations, tool trace, status |
+| `POST /chat/confirm` | `{session_id, token, approve}` creates or cancels a proposed ticket |
+| `GET /health` | Status, MCP connection and tool count, LLM providers, index build info |
+| `GET /tools` | Live `tools/list` from the MCP server |
+| `GET /employees`, `GET /demo-tasks` | Picker data and the question library |
+| `GET /eval/latest` | Headline numbers from the newest committed evaluation results |
+
+## Demo tasks
+
+In the UI, pick the employee and click the question in the left panel, or use curl:
+
+```bash
+# 1. Remote work abroad -> needs review; a ticket is proposed, created only on Confirm
+curl -s localhost:8000/chat -H "content-type: application/json" -d "{\"employee_id\":\"E-1001\",\"message\":\"Can I work from Mexico City for 6 weeks starting January 11, 2027? If it needs a review, open a ticket.\"}"
+
+# 2. PTO request -> allowed with manager approval; email drafted, not sent
+curl -s localhost:8000/chat -H "content-type: application/json" -d "{\"employee_id\":\"E-1002\",\"message\":\"Can I take 3 days of PTO starting Monday November 9? If yes, draft an email to my manager.\"}"
 ```
 
-## CI and validation
-The repository includes a GitHub Actions workflow that installs dependencies and runs the pytest suite on Python 3.13 for push and pull request. The TF-IDF vector index is rebuilt from committed policy files at application startup; no model download or paid API is required.
+The full question list with expected results is in [docs/demo-questions.md](docs/demo-questions.md).
 
-## Deployment notes
-This project is designed for a single-service free-tier deployment. A Render or Railway service can run the FastAPI app and local MCP-style tool layer together without a paid database.
+## Tests and evaluation
 
-### Render deployment
-Use the included `render.yaml` or a single web service with the following settings:
-- Build command: `pip install -r requirements.txt`
-- Start command: `uvicorn app.main:app --host 0.0.0.0 --port 10000`
-- Python version: `3.13`
+```bash
+ruff check .
+pytest -q                                   # 90 tests, no API key or network needed
+python -m evaluation.run_eval --retrieval-only          # top-k x embedder ablation, no LLM
+python -m evaluation.run_eval                           # 28 cases, ~30 s apart (free-tier limits)
+python -m evaluation.run_eval --mode rag_only --cases W01,W02,W03,W04,W05,W06,W07,W08
+python -m evaluation.latency_probe https://<app>.onrender.com   # cold start, ~50 min
+```
 
-### Demo tasks for grading
-Use the `/demo-tasks` endpoint or the UI to reproduce the required tasks:
-1. Remote work eligibility: "Can Ava work remotely from another state for six weeks?"
-2. PTO request guidance: "What is Ava's current PTO balance and what steps are required to request time off?"
+Results go to `evaluation/results/` and `evaluation/report.md` is regenerated.
 
-## Security notes
-- Secret keys should live in `.env` and are excluded from Git.
-- Synthetic employee data is intentionally mock and non-production.
-- The app avoids carrying out irreversible actions without explicit confirmation.
+## CI/CD and deployment
 
-## Evaluation
-Run `python -m app.evaluation` or open `/evaluate` to execute the 22-case benchmark. It reports keyword-based groundedness, source-section citation validity, expected-tool overlap, workflow completion, safety pass rate, observed p50/p95 latency, and retrieval keyword-coverage comparisons at top-k 1, 3, and 5. The local snapshot and its limitations are recorded in [docs/requirements-traceability.md](docs/requirements-traceability.md). These are lightweight proxy metrics, not human-judged quality scores or cold-start measurements.
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request: lint, import
+check, keyless index build, the test suite, the retrieval ablation and a smoke test that starts the
+app and requires `/health` to show the MCP server connected. On `main` only, and only after those
+pass, the `deploy` job calls the Render deploy hook and waits for the new instance's `/health`.
+Render's own auto-deploy is off (`render.yaml`), so CI is the only path to production.
 
-## Requirements status
-See [docs/requirements-traceability.md](docs/requirements-traceability.md) for the end-to-end flow and a checked/partial/open checklist against the assignment. The deployed shareable URL, target corpus length, stronger semantic embeddings, and formal ablation interpretation still require follow-up; the checklist makes those limitations explicit.
+Render free tier: the service sleeps after 15 minutes idle, and the first request after that
+takes about a minute. A `Dockerfile` is included as a portable alternative.
+
+## Security
+
+- Keys come from environment variables only; `.env` is git-ignored.
+- The LLM never sees the ticket confirmation token; only the user's Confirm click sends it.
+- Model output is rendered with `textContent`, never as HTML.
+- Users can only read their own records (the employee picked in the UI).

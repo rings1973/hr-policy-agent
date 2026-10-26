@@ -8,6 +8,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      EMBEDDING_BACKEND: tfidf
+      INDEX_DIR: ${{ github.workspace }}/.ci-index
+      REFERENCE_DATE: '2026-10-22'
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -16,6 +20,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+          cache: pip
 
       - name: Install dependencies
         run: |
@@ -25,11 +30,55 @@ jobs:
       - name: Lint
         run: ruff check .
 
+      - name: Import check
+        run: python -c "import app.main, hr_mcp.server, evaluation.run_eval"
+
       - name: Build keyless TF-IDF index
-        run: python -m app.rag.ingest --embedder tfidf --out "$RUNNER_TEMP/index"
+        run: python -m app.rag.ingest --embedder tfidf --out "$INDEX_DIR"
 
       - name: Run tests
         run: pytest -q
+
+      - name: Validate evaluation cases and run retrieval ablation (no LLM)
+        run: python -m evaluation.run_eval --retrieval-only --embedders tfidf --no-save
+
+      # Start the real app (MCP subprocess included) and check that /health reports the MCP
+      # server connected with its tools. No LLM key here, so status is "degraded" by design.
+      - name: Smoke test the running app
+        run: |
+          uvicorn app.main:app --port 8000 &
+          curl -fsS --retry 20 --retry-delay 1 --retry-all-errors http://127.0.0.1:8000/health -o health.json
+          cat health.json
+          python -c "import json; h = json.load(open('health.json')); assert h['mcp']['connected'] and h['mcp']['tool_count'] >= 5, h"
+
+  # Deploys only after every test passes, and only from main. Render's own auto-deploy is off
+  # (render.yaml), so this job is the only path to production.
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Render deploy
         env:
-          EMBEDDING_BACKEND: tfidf
-          INDEX_DIR: ${{ runner.temp }}/index
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL secret is not set"; exit 1
+          fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "Deploy triggered"
+
+      - name: Wait for the new deploy to report healthy
+        if: vars.RENDER_APP_URL != ''
+        env:
+          APP_URL: ${{ vars.RENDER_APP_URL }}
+        run: |
+          sleep 60  # let Render start the build before polling the old instance
+          for i in $(seq 1 54); do
+            if curl -fsS "$APP_URL/health" -o health.json && grep -q '"connected":true' health.json; then
+              cat health.json; exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::$APP_URL/health did not report mcp.connected within 10 minutes"; exit 1
