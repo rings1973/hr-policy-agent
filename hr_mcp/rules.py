@@ -124,6 +124,19 @@ def business_days_until(today: date, start: date) -> int:
     return days
 
 
+def last_business_day(start: date, days: float) -> date:
+    """Last weekday of a run of `days` business days starting on `start` (partial days round up)."""
+    remaining, current = max(1, int(-(-days // 1))), start
+    while current.weekday() >= 5:
+        current += timedelta(days=1)
+    while True:
+        if current.weekday() < 5:
+            remaining -= 1
+            if remaining == 0:
+                return current
+        current += timedelta(days=1)
+
+
 def _not_covered(decision: Decision, employee: dict[str, Any], policy_ref: str, what: str) -> bool:
     group = NOT_COVERED.get(employee["employment_type"])
     if group:
@@ -176,6 +189,13 @@ def check_pto(employee: dict[str, Any], balance: dict[str, Any], days: float | N
         else:
             d.hit("notice", "pass", f"{given} business days' notice (at least {required} needed).",
                   PTO_NOTICE)
+
+    if start_date is not None and days is not None and days >= 1:
+        # Give the model the date range instead of letting it do calendar arithmetic.
+        end = last_business_day(start_date, days)
+        d.hit("dates", "info", f"{days:g} business days from {start_date.isoformat()} "
+              f"({start_date:%A}) end on {end.isoformat()} ({end:%A}), not counting holidays.",
+              PTO_NOTICE)
 
     if days is not None and days > PTO_LONG_REQUEST_DAYS:
         d.hit("coverage_plan", "action_required",

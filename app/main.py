@@ -6,8 +6,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
-from app.agent import HRPolicyAgent
 from app.evaluation import run_evaluation
+from app.legacy_agent import HRPolicyAgent
 from app.legacy_rag import EmployeeStore, PolicyRAG
 from app.mcp_server import MCPToolServer
 

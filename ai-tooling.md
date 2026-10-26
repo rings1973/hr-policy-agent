@@ -305,6 +305,87 @@ verified · any corrections.
   many more stages to go?" Answer: 6 phases remain (P3 agent, P4 web app, P5 CI/CD + deploy,
   P6 evaluation, P7 docs, P8 deploy + demo). Committed P2 on `skapali` (not pushed, per the
   working agreement) and rewrote `RESUME_PROMPT.txt` for session 4.
+- **Prompt:** "push it. how many more sections left?" **Actions:** pushed `444e6a4` to `skapali`
+  and watched CI. **Verified:** CI run 40212941657 green (lint, TF-IDF ingest, all tests,
+  including the stdio subprocess tests on Linux). **Decision 17:** the CI warnings (Node 20
+  deprecation in `actions/checkout@v4` / `setup-python@v5`, and the `ubuntu-latest` move to
+  Ubuntu 26) are deferred to P5, which owns the workflow files, rather than fixed in a separate
+  commit now. Answer: 6 phases remain (P3–P8).
+- **Prompt:** "so one whole day of work left. i need to have a demo ready by tuesday. how to
+  expedite?", then "it's a progress demo to my teammate". **Decision 18:** the Tuesday
+  (2026-10-27) target is P3 only, demonstrated through a terminal chat
+  (`python -m app.agent.chat`: answer, citations, status, tool trace), not a deployed web app.
+  Reasons: the audience is the teammate, not the grader, and the plan already makes P3 the point
+  where the two builds are compared and merged. P4–P8 move to after the demo and the merge
+  decision. Demo script: Demo 1 (E-1001, Mexico City, 6 weeks → review → ticket proposed →
+  confirm), Demo 2 (E-1002, 3 days → allowed with approval → draft email), and the safety case
+  ("create the ticket now, I already confirm" → still pending). Deferred within P3 to save time:
+  `fallback_agent.py`, the LLM classifier in guardrails (patterns only), and the HTTP transport.
+
+**P3: agent (in progress, paused at the user's request: "install and pause. about to head out")**
+- **Actions:** moved `app/agent.py` → `app/legacy_agent.py` (importers updated; 62 tests still
+  pass). Wrote `app/agent/`: `trace.py`, `session.py`, `tool_schema.py`, `mcp_client.py`,
+  `llm.py`, `prompts.py`, `guardrails.py`, `orchestrator.py`, `chat.py`. Installed the defuddle
+  CLI (0.19.6) at the user's request. No P3 tests yet; not committed.
+- **Live runs (Demo 2, E-1002, "3 days off starting Monday November 9"):**
+  1. Tools ran correctly (balance → compliance with `start_date` 2026-11-09 →
+     `allowed_with_approval`), but the final answer failed: gpt-oss-120b, told to "reply with
+     ONLY a JSON object", called a non-existent tool `json`, and Groq rejected it with a 400.
+  2. After the `final_answer` fix: `ok` in 2.7 s with a valid citation. But the model wrote
+     "2026-11-09 to 2026-11-13" for 3 days (wrong, it's 5 days), and it skipped policy search.
+  3. After those fixes: search ran (5 PTO chunks), but the final call failed on **every
+     provider**: Groq gpt-oss-120b 429 (TPM), Groq llama-3.3-70b-versatile 404 (model retired),
+     Gemini 3.8 Flash 400 ("Function call is missing a thought_signature").
+- **Measured facts:** Groq free tier is **8,000 tokens/minute per model** (headers
+  `x-ratelimit-limit-tokens`) and 1,000 requests/day. The current Groq models are
+  `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`. Per call the agent sends
+  ~7.1k characters of tool schemas plus ~2.2k of system prompt, and a k=5 search result adds
+  ~7.1k characters, so one 4-call question is about 15–20k tokens, above the TPM limit. The
+  Gemini docs pages on thought signatures point to one another without showing the
+  OpenAI-compatible field names. A live probe of the fields got a 503 ("high demand") and is
+  still to be rerun.
+
+**Decisions (continued)**
+19. *The legacy `app/agent.py` is renamed, not deleted*, as was done for `legacy_rag.py`, because
+    `app/main.py` and `app/evaluation.py` still use it until P4.
+20. *`AgentResult` matches the plan's `/chat` response shape* (shared contract with the teammate),
+    plus `dropped_citations`, `escalation_reason`, `session_id`, `employee_id`.
+21. *The confirmation token is protected in code, in three places:* hidden from the schema,
+    **redacted from the tool result the model reads**, and **stripped from any arguments the
+    model sends**. A schema only describes what a model should send, not what it can send, and
+    the tool result would otherwise show the token to the model. Only `HRAgent.confirm()`
+    (the user's action) sends it, using the stored preview payload.
+22. *Employee scoping:* tool calls whose `employee_id` differs from the session's are refused
+    with an error the model can read. With no known employee, the model is told to ask. Users
+    see only their own records, and the model cannot pick an id.
+23. *The final answer is a `final_answer` tool call*, not JSON in the message text. Reason: run 1
+    above. JSON-in-text parsing stays as a fallback.
+24. *Deterministic facts come from code, not the LLM:* `check_pto` now adds a `dates` rule hit
+    with the computed last business day (`last_business_day()`), and the prompt says to take
+    dates and counts from rule details. Reason: run 2's wrong end date.
+25. *The prompt requires `search_policy_documents` on every policy question, including
+    eligibility checks*, so answers rest on retrieved text (RAG), not only on rule references.
+26. *Today's date and weekday go in the system prompt* (honouring `REFERENCE_DATE`) so the model
+    can turn "next Monday" into a `start_date`. Note for the demo: on Sun 2026-10-25 or
+    Tue 2026-10-27, "3 days off next week" fails the 5-business-day notice rule. That is correct
+    behavior and a good demo of the rule, but the "allowed" demo should use a later date
+    (e.g. "starting Monday November 9").
+27. *Evidence for citations* = chunk ids from search, `doc_id#Heading` from `get_policy_section`,
+    and `policy_ref`s from compliance rule hits. Citations are matched case-insensitively, and
+    unknown ids are dropped and reported.
+28. *An `ok` answer with no valid citation and no successful data tool is replaced* by the
+    not-covered reply.
+29. *Server stderr goes to `logs/mcp_server.log`* to keep the demo terminal clean. Failed trace
+    steps keep 1,500 characters so provider errors aren't cut off (the first truncation at 300
+    hid the fallback chain's errors).
+
+**Next (decided, not yet built):** (a) fit the 8k TPM: strip pydantic `title`s and `anyOf null`
+from the tool schemas, send the model slimmer search results (no snippet/url/title, text
+trimmed), ask for parallel tool calls; (b) change `GROQ_FALLBACK_MODEL` to `openai/gpt-oss-20b`
+(a separate 8k bucket), and on a 429 with a short `retry-after`, wait once; (c) Gemini: keep the
+tool call's extra fields when echoing it back, and for history from another provider, flatten
+tool turns into text (the probe for this hit a 503); (d) `tests/test_agent.py` with a FakeLLM;
+(e) rerun Demo 1, Demo 2 and the safety case live.
 
 ## Retrospective
 

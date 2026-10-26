@@ -4,7 +4,7 @@ import math
 import time
 from typing import Any
 
-from app.agent import HRPolicyAgent
+from app.legacy_agent import HRPolicyAgent
 from app.legacy_rag import EmployeeStore, PolicyRAG
 from app.mcp_server import MCPToolServer
 
