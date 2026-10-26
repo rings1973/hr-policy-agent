@@ -61,6 +61,9 @@ class HRDataStore:
             raise NotFound(f"Unknown {label} id {record_id!r}. Known ids: {known}.")
         return dict(record)
 
+    def employee_ids(self) -> list[str]:
+        return sorted(self._employees)
+
     def employee(self, employee_id: str) -> dict[str, Any]:
         return self._get(self._employees, employee_id, "employee")
 

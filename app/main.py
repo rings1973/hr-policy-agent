@@ -1,298 +1,146 @@
+"""Web app for the HR policy agent.
+
+    uvicorn app.main:app --reload            http://127.0.0.1:8000
+
+The lifespan starts one MCP server subprocess (hr_mcp.server over stdio) and builds the agent;
+both live for the whole app. If startup fails the app still serves, with /health "degraded" and
+/chat returning an error status, so the page can explain what is wrong.
+"""
+
 from __future__ import annotations
 
-import json
+import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from typing import Any
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
-from pydantic import BaseModel
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 
-from app.evaluation import run_evaluation
-from app.legacy_agent import HRPolicyAgent
-from app.legacy_rag import EmployeeStore, PolicyRAG
-from app.mcp_server import MCPToolServer
+from app import config, demo_questions
+from app.agent import AgentResult, HRAgent, LLMClient, MCPToolClient, SessionStore
+from hr_mcp.data_store import HRDataStore
 
-app = FastAPI(title="HR Policy Agent")
-rag = PolicyRAG()
-employee_store = EmployeeStore()
-mcp_server = MCPToolServer(rag=rag, employee_store=employee_store)
-agent = HRPolicyAgent(mcp_server=mcp_server)
+STATIC_DIR = config.BASE_DIR / "app" / "static"
+VERSION = "0.4.0"
 
 
-@app.get("/health")
-def health() -> dict[str, object]:
-    return {
-        "status": "ok",
-        "app": "hr-policy-agent",
-        "mcp": {"connected": True, "tool_count": len(mcp_server.list_tools())},
-    }
+@dataclass
+class AppState:
+    sessions: SessionStore = field(default_factory=SessionStore)
+    tools: MCPToolClient | None = None
+    agent: HRAgent | None = None
+    llm: LLMClient | None = None
+    startup_error: str | None = None
 
 
-@app.post("/mcp")
-async def mcp(request: Request) -> Response:
-    """Stateless MCP Streamable HTTP endpoint for initialize, discovery, and tool calls."""
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    state = AppState()
     try:
-        payload = await request.json()
-    except ValueError:  # json.JSONDecodeError subclasses ValueError
-        return JSONResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}, status_code=400)
+        tools = MCPToolClient()
+        await tools.start()
+        state.tools, state.llm = tools, LLMClient()
+        state.agent = HRAgent(state.llm, tools)
+    except Exception as exc:  # noqa: BLE001 - serve a degraded app rather than crash
+        state.startup_error = f"{type(exc).__name__}: {exc}"
+    app.state.hr = state
+    try:
+        yield
+    finally:
+        if state.tools is not None:
+            await state.tools.aclose()
 
-    if not isinstance(payload, dict) or payload.get("jsonrpc") != "2.0" or not isinstance(payload.get("method"), str):
-        return JSONResponse({"jsonrpc": "2.0", "id": payload.get("id") if isinstance(payload, dict) else None, "error": {"code": -32600, "message": "Invalid Request"}}, status_code=400)
 
-    method = payload["method"]
-    request_id = payload.get("id")
-    if method == "notifications/initialized" and request_id is None:
-        return Response(status_code=202)
+app = FastAPI(title="HR Policy Agent", version=VERSION, lifespan=lifespan)
 
-    if request_id is None:
-        return Response(status_code=202)
 
-    if method == "initialize":
-        params = payload.get("params") or {}
-        result = {
-            "protocolVersion": params.get("protocolVersion", "2025-03-26"),
-            "capabilities": {"tools": {}},
-            "serverInfo": {"name": "hr-policy-agent", "version": "1.0.0"},
-        }
-    elif method == "ping":
-        result = {}
-    elif method == "tools/list":
-        result = {"tools": mcp_server.list_tools()}
-    elif method == "tools/call":
-        params = payload.get("params") or {}
-        tool_name = params.get("name")
-        arguments = params.get("arguments") or {}
-        try:
-            tool_result = mcp_server.call_tool(tool_name, arguments)
-            result = {
-                "content": [{"type": "text", "text": json.dumps(tool_result, ensure_ascii=True)}],
-                "structuredContent": tool_result,
-                "isError": "error" in tool_result,
-            }
-        except (TypeError, ValueError) as error:
-            result = {"content": [{"type": "text", "text": str(error)}], "isError": True}
-    else:
-        return JSONResponse({"jsonrpc": "2.0", "id": request_id, "error": {"code": -32601, "message": f"Method not found: {method}"}}, status_code=200)
-
-    return JSONResponse({"jsonrpc": "2.0", "id": request_id, "result": result})
+def hr(request: Request) -> AppState:
+    return request.app.state.hr
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(min_length=1, max_length=2000)
+    session_id: str | None = None
+    employee_id: str | None = None
+
+
+class ConfirmRequest(BaseModel):
+    session_id: str
+    token: str
+    approve: bool
+
+
+def unavailable(state: AppState, session_id: str, employee_id: str | None) -> dict[str, Any]:
+    return AgentResult(f"The assistant could not start: {state.startup_error}", "error",
+                       session_id, employee_id).to_dict()
 
 
 @app.post("/chat")
-def chat(request: ChatRequest) -> dict[str, object]:
-    result = agent.handle_message(request.message)
-    return {
-        "answer": result["answer"],
-        "citations": result.get("citations", []),
-        "tool_trace": result.get("tool_trace", []),
-        "status": result.get("status", "ok"),
-    }
+async def chat(body: ChatRequest, request: Request) -> dict[str, Any]:
+    state = hr(request)
+    session = state.sessions.get(body.session_id)
+    picked = (body.employee_id or "").strip().upper() or None
+    if picked != session.employee_id:
+        session.employee_id = picked  # the "Acting as" picker is the source of identity
+    if state.agent is None:
+        return unavailable(state, session.session_id, session.employee_id)
+    return (await state.agent.run(body.message, session)).to_dict()
 
 
-@app.get("/evaluate")
-def evaluate() -> dict[str, object]:
-    return run_evaluation()
+@app.post("/chat/confirm")
+async def confirm(body: ConfirmRequest, request: Request) -> dict[str, Any]:
+    state = hr(request)
+    session = state.sessions.get(body.session_id)
+    if state.agent is None:
+        return unavailable(state, session.session_id, session.employee_id)
+    return (await state.agent.confirm(session, body.token, body.approve)).to_dict()
+
+
+@app.get("/health")
+async def health(request: Request) -> dict[str, Any]:
+    state = hr(request)
+    mcp: dict[str, Any] = {"connected": False, "transport": "stdio", "tool_count": 0}
+    if state.tools is not None and state.tools.connected:
+        start = time.perf_counter()
+        try:
+            mcp["tool_count"] = len(await state.tools.list_tools())
+            mcp["connected"] = True
+        except Exception as exc:  # noqa: BLE001
+            mcp["error"] = str(exc)
+        mcp["ping_ms"] = int((time.perf_counter() - start) * 1000)
+    providers = [f"{p.name}/{p.model}" for p in state.llm.providers] if state.llm else []
+    ok = mcp["connected"] and bool(providers)
+    return {"status": "ok" if ok else "degraded", "version": VERSION, "mcp": mcp,
+            "llm": {"providers_configured": providers},
+            **({"error": state.startup_error} if state.startup_error else {})}
+
+
+@app.get("/tools")
+async def tools(request: Request) -> dict[str, Any]:
+    state = hr(request)
+    if state.tools is None:
+        return {"tools": []}
+    return {"tools": [{"name": t.name, "description": (t.description or "").split("\n")[0]}
+                      for t in await state.tools.list_tools()]}
+
+
+@app.get("/employees")
+def employees() -> dict[str, Any]:
+    """Names and roles for the "Acting as" picker (synthetic records, no balances)."""
+    store = HRDataStore(config.MOCK_DATA_DIR)
+    rows = [store.employee(eid) for eid in store.employee_ids()]
+    return {"employees": [{"employee_id": e["employee_id"], "name": e["name"], "role": e["role"],
+                           "employment_type": e["employment_type"]} for e in rows]}
 
 
 @app.get("/demo-tasks")
-def demo_tasks() -> dict[str, list[str]]:
-    return {
-        "tasks": [
-            "Can Ava work remotely from another state for six weeks?",
-            "What is Ava's current PTO balance and what steps are required to request time off?",
-        ]
-    }
+def demo_tasks() -> dict[str, Any]:
+    return {"groups": demo_questions.as_dict()}
 
 
-@app.get("/", response_class=HTMLResponse)
-def index() -> str:
-    return """
-    <html>
-      <head>
-        <title>HR Policy Agent</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            background: linear-gradient(180deg, #f3f8ff 0%, #eef1f7 100%);
-            color: #1f2937;
-          }
-          .card {
-            max-width: 860px;
-            margin: 2.5rem auto;
-            background: #ffffff;
-            padding: 2rem;
-            border-radius: 18px;
-            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
-          }
-          h1 {
-            margin: 0 0 1rem 0;
-            font-size: 2rem;
-            color: #1f4fd8;
-          }
-          .subtitle {
-            color: #52607a;
-            margin-bottom: 1rem;
-          }
-          textarea {
-            width: 100%;
-            min-height: 110px;
-            box-sizing: border-box;
-            padding: 1rem;
-            border: 1px solid #d8e0ef;
-            border-radius: 12px;
-            font-size: 1rem;
-            resize: vertical;
-            background: #f8fbff;
-          }
-          button {
-            margin-top: 1rem;
-            padding: 0.8rem 1.5rem;
-            background: linear-gradient(135deg, #2d6df6, #2257d6);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-          }
-          button:hover { filter: brightness(0.98); }
-          #output {
-            margin-top: 1.5rem;
-          }
-          .chat {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-          }
-          .assistant-message,
-          .source-card,
-          .trace-card {
-            padding: 1rem 1.1rem;
-            border-radius: 14px;
-            background: #f8fafc;
-            border: 1px solid #e5e7eb;
-          }
-          .assistant-message {
-            background: #edf7ff;
-            border-color: #dbeafe;
-            line-height: 1.6;
-          }
-          .label {
-            font-size: 0.72rem;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            font-weight: 700;
-            color: #495d7d;
-            margin-bottom: 0.45rem;
-          }
-          .status-pill {
-            display: inline-block;
-            margin-top: 0.8rem;
-            padding: 0.35rem 0.7rem;
-            background: #dcfce7;
-            color: #166534;
-            border-radius: 999px;
-            font-size: 0.75rem;
-            font-weight: 700;
-          }
-          .source-card ul, .trace-card ul {
-            margin: 0.4rem 0 0 1.1rem;
-            padding: 0;
-          }
-          .source-card li, .trace-card li {
-            margin-bottom: 0.5rem;
-            line-height: 1.5;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h1>HR Policy Assistant</h1>
-          <div class="subtitle">Ask a question about PTO, remote work, benefits, or company policy.</div>
-          <textarea id="message" placeholder="Example: Can Ava work remotely from another state for six weeks?"></textarea>
-          <button id="ask-button">Ask</button>
-          <div id="output"></div>
-        </div>
-        <script>
-          function safeText(value) {
-            return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          }
-
-          window.renderResult = function(data) {
-            const output = document.getElementById('output');
-            const citations = Array.isArray(data.citations) ? data.citations : [];
-            const trace = Array.isArray(data.tool_trace) ? data.tool_trace : [];
-            const statusText = data.status ? data.status.toUpperCase() : 'OK';
-            const answerText = String(data.answer || 'I can help with HR policy questions.').split(String.fromCharCode(10)).join('<br>');
-
-            const sourceHtml = citations.length ? '<ul>' + citations.map(function(item) {
-              const title = safeText(item.title || item.document_id || 'Policy');
-              const section = safeText(item.section || 'Policy section');
-              const snippet = safeText(item.snippet || '');
-              return '<li><strong>' + title + '</strong> — ' + section + '<br>' + snippet + '</li>';
-            }).join('') + '</ul>' : '<p>No policy references were returned.</p>';
-
-            const traceHtml = trace.length ? '<ul>' + trace.map(function(item) {
-              const toolName = safeText(item.tool || 'Tool');
-              const argsText = safeText(JSON.stringify(item.arguments || {}));
-              return '<li><strong>' + toolName + '</strong>: ' + argsText + '</li>';
-            }).join('') + '</ul>' : '<p>No extra checks were needed.</p>';
-
-            output.innerHTML =
-              '<div class="chat">' +
-              '<div class="assistant-message">' +
-              '<div class="label">Assistant</div>' +
-              '<div>' + answerText + '</div>' +
-              '<div class="status-pill">' + statusText + '</div>' +
-              '</div>' +
-              '<div class="source-card">' +
-              '<div class="label">Sources</div>' +
-              sourceHtml +
-              '</div>' +
-              '<div class="trace-card">' +
-              '<div class="label">What I checked</div>' +
-              traceHtml +
-              '</div>' +
-              '</div>';
-          };
-
-          window.ask = async function() {
-            const message = document.getElementById('message').value.trim();
-            const output = document.getElementById('output');
-            if (!message) {
-              output.innerHTML =
-                '<div class="assistant-message">' +
-                '<div class="label">Assistant</div>' +
-                '<div>Please ask a question about PTO, remote work, benefits, or company policy.</div>' +
-                '</div>';
-              return;
-            }
-
-            output.innerHTML =
-              '<div class="assistant-message">' +
-              '<div class="label">Assistant</div>' +
-              '<div>Thinking about your HR question...</div>' +
-              '</div>';
-
-            const res = await fetch('/chat', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({message})
-            });
-            const data = await res.json();
-            window.renderResult(data);
-          };
-
-          document.addEventListener('DOMContentLoaded', function () {
-            const button = document.getElementById('ask-button');
-            if (button) {
-              button.addEventListener('click', window.ask);
-            }
-          });
-        </script>
-      </body>
-    </html>
-    """
+@app.get("/")
+def index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")

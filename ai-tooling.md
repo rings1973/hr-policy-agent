@@ -465,6 +465,23 @@ tool turns into text (the probe for this hit a 503); (d) `tests/test_agent.py` w
 41. *List fields from the model are normalized* (`_as_list`): a string becomes a one-item list.
 42. *Evaluation gains a 28th case* (the accrual question with gold 19.17 / 6.17 / 5), and the
     P6 budget is restated in tokens per minute, which is the binding limit.
+43. *Web app pulled forward from P4 for the demo* (prompt: "can you build a web app so i can do
+    this interactively insted of over command window? also geenrate the list of questions").
+    `app/main.py` replaces the legacy app: the lifespan starts one MCP subprocess and the agent;
+    `/chat`, `/chat/confirm`, `/health`, `/tools`, `/employees`, `/demo-tasks`, `/`. The UI is a
+    single static `app/static/index.html` (no Jinja or build step): "Acting as" picker, a
+    question library, answer cards with a status pill, facts, recommendations, source cards and a
+    collapsible tool trace, and Confirm/Cancel for proposed tickets. Model output is rendered
+    with `textContent` only (a test checks `innerHTML` is absent).
+44. *The picker is the identity source:* changing it starts a new session, and `/chat` sets the
+    session's employee from it. A proposed ticket is confirmed against the session that proposed
+    it (a live click found a 422 when the picker had changed in between).
+45. *One question list* in `app/demo_questions.py` (24 questions in 5 groups, each with the
+    employee and the expected result) feeds the UI and `/demo-tasks`, and is mirrored in
+    `docs/demo-questions.md`. The legacy `tests/test_mcp_tools.py` and the legacy-app tests were
+    removed as the plan scheduled; `tests/test_app.py` now runs the real lifespan with the
+    FakeLLM (6 tests). Deferred P4 items: `/mcp` HTTP mount, `/eval/latest`, deleting the legacy
+    modules.
 
 ## Retrospective
 

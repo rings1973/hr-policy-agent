@@ -20,6 +20,7 @@ embeddings (TF-IDF baseline) · Render free tier · GitHub Actions. Sources: [`r
 | P2 step 0: disclaimer-only chunks dropped, PDF label fixed (137 → 133 chunks) | ✅ done (2026-10-25) |
 | P2 `hr_mcp/` (data_store, rules, server with 9 tools) + 32 rule tests + 4 real stdio `ClientSession` tests | ✅ done (2026-10-25): 62 tests total. `REFERENCE_DATE` pins "today" for date rules. MCP Inspector check (`mcp dev`) not yet run |
 | P3 `app/agent/` (orchestrator, MCP client, LLM chain, guardrails, terminal chat) + 10th tool `project_pto_balance` + 13 FakeLLM agent tests | ✅ done (2026-10-26): 83 tests. Demo 1, Demo 2, safety case and the accrual question pass live on Groq (qwen → gpt-oss chain). Deferred: `fallback_agent.py`, LLM guardrail classifier, HTTP transport |
+| P4 web app (pulled forward for the demo): `app/main.py` + `app/static/index.html`, question library (`app/demo_questions.py`, `docs/demo-questions.md`), 6 app tests | 🔶 mostly done (2026-10-26): 82 tests. Not yet: `/mcp` HTTP mount, `/eval/latest`, deleting legacy modules |
 | Everything else | ⏳ Phases 3–8 below |
 
 **What you (the user) need to provide:**

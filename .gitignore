@@ -10,3 +10,6 @@ venv/
 app/data/index/
 logs/
 .ruff_cache/
+
+# Browser automation screenshots and logs
+.playwright-mcp/
