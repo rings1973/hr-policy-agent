@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date
@@ -231,18 +232,42 @@ def draft_hr_email(
     subject: str,
     body: str,
     employee_id: Annotated[str | None, Field(
-        description="The employee writing; required when recipient_id is MANAGER.")] = None,
+        description="The employee writing (the sender). Always pass it when known; required "
+                    "when recipient_id is MANAGER.")] = None,
 ) -> dict[str, Any]:
     """Draft an email to a manager, employee or People Operations for the user to review. It is
-    never sent: the result has status draft_not_sent."""
+    never sent: the result has status draft_not_sent. With employee_id, the draft is signed by
+    that employee and name placeholders such as [Your Name] are filled in; any other bracketed
+    placeholder is reported in unfilled_placeholders."""
     with tool_errors():
         if recipient_id.strip().upper() == "MANAGER":
             if not employee_id:
                 raise ToolError("recipient_id MANAGER needs employee_id.")
             recipient_id = store().employee(employee_id)["manager_id"]
         recipient = store().recipient(recipient_id)
-    return {"status": "draft_not_sent",
-            "draft": {"to": recipient, "subject": subject, "body": body}}
+        sender = store().recipient(employee_id) if employee_id else None
+    body, unfilled = fill_placeholders(body, sender, recipient)
+    draft = {"to": recipient, "subject": subject, "body": body}
+    if sender:
+        draft = {"from": sender, **draft}
+    return {"status": "draft_not_sent", "draft": draft, "unfilled_placeholders": unfilled}
+
+
+# Template slots models leave in drafts when they do not know a name, e.g. "[Your Name]".
+_SENDER_SLOT = re.compile(r"\[(?:your|my|employee'?s?|sender'?s?)\s+(?:full\s+)?name\]",
+                          re.IGNORECASE)
+_RECIPIENT_SLOT = re.compile(r"\[(?:manager'?s?|recipient'?s?)\s+(?:full\s+)?name\]",
+                             re.IGNORECASE)
+_ANY_SLOT = re.compile(r"\[[^\[\]\n]{1,40}\]")
+
+
+def fill_placeholders(body: str, sender: dict[str, Any] | None,
+                      recipient: dict[str, Any]) -> tuple[str, list[str]]:
+    """Replace name slots with real names and list the bracketed slots that remain unfilled."""
+    if sender:
+        body = _SENDER_SLOT.sub(sender["name"], body)
+    body = _RECIPIENT_SLOT.sub(recipient["name"], body)
+    return body, sorted(set(_ANY_SLOT.findall(body)))
 
 
 @mcp.tool(annotations=MOCK_ACTION)

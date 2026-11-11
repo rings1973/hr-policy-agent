@@ -85,8 +85,12 @@ def test_data_tools_and_errors(server_params):
                            subject="PTO", body="Requesting 3 days.")
         assert email.structured_content["status"] == "draft_not_sent"
         mine = await call(session, "draft_hr_email", recipient_id="manager", employee_id="E-1002",
-                          subject="PTO", body="Requesting 3 days.")
-        assert mine.structured_content["draft"]["to"]["id"] == "M-42"
+                          subject="PTO",
+                          body="Hi [Manager Name],\nRequesting 3 days from [Start Date].\n[Your Name]")
+        draft = mine.structured_content["draft"]
+        assert draft["to"]["id"] == "M-42" and draft["from"]["id"] == "E-1002"
+        assert draft["body"] == "Hi Jordan Rivera,\nRequesting 3 days from [Start Date].\nMarcus Lee"
+        assert mine.structured_content["unfilled_placeholders"] == ["[Start Date]"]
         orphan = await call(session, "draft_hr_email", recipient_id="MANAGER", subject="s",
                             body="b")
         assert orphan.is_error and "needs employee_id" in orphan.content[0].text

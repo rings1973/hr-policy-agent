@@ -522,6 +522,50 @@ tool turns into text (the probe for this hit a 503); (d) `tests/test_agent.py` w
     `mcp_server.py`, `app/data/employee_data.json`, `config.EMPLOYEE_FILE`) now that
     `evaluation/` replaces the last importer.
 
+### Session 5: 2026-11-10/11, merge decision, tracker, release prep
+
+- **Prompt:** "decision has been made to use my implementation … update the tasks that have been
+  completed first. next create a plan to complete the rest of the project tomorrow"; then "go".
+- **Actions:**
+  - Checked each of the 42 rows of the team's checklist workbook against the repo (files, tests,
+    CI runs, eval results, `gh` collaborators) and set the Status column: 30 Completed,
+    8 In Progress, 4 Not Started.
+  - Wrote a day plan and a step-by-step checklist (outside the repo).
+  - Bumped the CI actions to their current majors.
+  - Fixed `[Your Name]` placeholders in email drafts.
+- **Found:**
+  - The gh login (`roasoul`) has push but not admin on the repo, so only the owner `rings1973`
+    can invite `quantic-grader` and add the deploy secret and variable.
+  - The `deploy` job fails on purpose without `RENDER_DEPLOY_HOOK_URL`, so the merge to `main`
+    has to wait until that secret exists.
+- **Verified:**
+  - 90 tests pass and lint is clean.
+  - The new draft assertion fails when the placeholder fix is disabled (mutation check), then
+    passes with it.
+- **Corrections:** a regex generated through a shell heredoc came out split across two lines, so
+  `hr_mcp/server.py` would not import. An import check caught it before any test ran, and the
+  line was fixed with a direct edit.
+
+**Decisions (continued)**
+53. *The team ships this implementation* (`skapali`), decided 2026-11-10. The teammate's separate
+    build is not merged. Reason: this branch already had P0–P4 with tests, CI and the evaluation
+    harness, so merging would have added risk with little gain. `skapali` is merged into `main`
+    once the deploy secret exists.
+54. *CI actions bumped to `actions/checkout@v7` and `actions/setup-python@v7`.* Reason: v4/v5 run
+    on the deprecated Node 20. The release notes for v5–v7 were read first: the breaking changes
+    (Node 24 runtime, removed `pip-install` input, fork checkout blocked for
+    `pull_request_target`) don't affect this workflow.
+55. *Email placeholders are filled in by the tool, not only by the prompt.* Reason:
+    - The model only knew the employee id, so it signed drafts "[Your Name]".
+    - `draft_hr_email` now takes the sender (`employee_id`), adds a `from` field, replaces sender
+      and recipient name slots with real names from the mock data, and reports any other
+      bracketed slot in `unfilled_placeholders` rather than guessing a value.
+    - A deterministic fix covers all four models in the fallback chain. The prompt also asks for
+      the sender id and a real signature.
+56. *Release order: Render first (from `skapali`), then the owner's secret, then the PR to `main`.*
+    Reason: the gated `deploy` job can only pass once the deploy hook secret exists, and the
+    Render service must exist before its hook does.
+
 ## Retrospective
 
 _Filled in during P7 from the session log above._
