@@ -14,6 +14,7 @@ import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -153,7 +154,9 @@ def employees() -> dict[str, Any]:
 
 @app.get("/demo-tasks")
 def demo_tasks() -> dict[str, Any]:
-    return {"groups": demo_questions.as_dict()}
+    # Same clock as the agent, so question dates and the agent's date rules agree.
+    today = date.fromisoformat(config.REFERENCE_DATE) if config.REFERENCE_DATE else None
+    return {"groups": demo_questions.as_dict(today)}
 
 
 @app.get("/eval/latest")

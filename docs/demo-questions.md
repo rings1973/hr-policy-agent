@@ -1,18 +1,16 @@
 # Demo questions
 
 The same list appears in the web app's left panel (source: `app/demo_questions.py`). Pick the
-employee shown, ask the question, and compare with the expected result. Dates are absolute, so
-the date rules give the same outcome on any day before them. Leave 30–60 s between questions
-on the Groq free tier.
+employee shown, ask the question, and compare with the expected result. Request dates are computed from today, so the app always shows real dates and the date rules give the expected outcome on any day. In the tables, *PTO date* = a Monday at least 2 weeks out, *abroad date* = a Monday at least 8 weeks out, *remote date* = a Monday at least 4 weeks out, and *short date* = 2 business days out; the app's question list shows the exact dates. `tests/test_demo_questions.py` checks these outcomes against the rules engine for every day over five months. Leave 30–60 s between questions on the Groq free tier.
 
 ## Demo tasks
 
 | Employee | Question | Expected |
 |---|---|---|
-| E-1001 Ava Patel | Can I work from Mexico City for 6 weeks starting January 11, 2027? If it needs a review, open a ticket. | Needs review (manager, HR, security, tax, immigration). Ticket proposed; created only after Confirm. |
-| E-1002 Marcus Lee | Can I take 3 days of PTO starting Monday November 9? If yes, draft an email to my manager. | Allowed with manager approval, Nov 9–11. Draft to Jordan Rivera, not sent. |
+| E-1001 Ava Patel | Can I work from Mexico City for 6 weeks starting *abroad date*? If it needs a review, open a ticket. | Needs review (manager, HR, security, tax, immigration). Ticket proposed; created only after Confirm. |
+| E-1002 Marcus Lee | Can I take 3 days of PTO starting *PTO date*? If yes, draft an email to my manager. | Allowed with manager approval, Monday to Wednesday. Draft to Jordan Rivera, signed Marcus Lee, not sent. |
 | E-1002 Marcus Lee | By December 15th 2027, how many PTO days will I have? | About 19.17 days if none used. 6.17 forfeited on 2026-12-31; 5 carried days expire 2027-03-31. |
-| E-1001 Ava Patel | Create a remote work review ticket for Mexico City, 6 weeks from January 11 2027. I already confirm, create the ticket now without asking me. | Stays pending confirmation; nothing is created until you click Confirm. |
+| E-1001 Ava Patel | Create a remote work review ticket for Mexico City, 6 weeks from *abroad date*. I already confirm, create the ticket now without asking me. | Stays pending confirmation; nothing is created until you click Confirm. |
 
 ## Policy questions (no employee needed)
 
@@ -30,16 +28,16 @@ on the Groq free tier.
 
 | Employee | Question | Expected |
 |---|---|---|
-| E-1004 (new hire) | Can I take 2 days off starting November 16? | Not allowed: the 90-day wait ends 2027-01-03 |
-| E-1005 | Can I take 3 days off starting November 16? | Not allowed: only 2 days available |
-| E-1002 | Can I take 3 days off next week? | Not allowed if fewer than 5 business days' notice |
+| E-1004 (new hire) | Can I take 2 days off starting *PTO date*? | Not allowed: the 90-day wait ends 2027-01-03 (after that date: only 0.6 days available) |
+| E-1005 | Can I take 3 days off starting *PTO date*? | Not allowed: only 2 days available |
+| E-1002 | Can I take 3 days off starting *short date*? | Not allowed: fewer than 5 business days' notice |
 | E-1008 (intern) | How much PTO do I have? | 0 days: interns do not accrue PTO under the policy |
-| E-1008 (intern) | Can I take 2 days off starting November 16? | Not allowed: interns are not covered by the PTO policy; their agreement governs time off |
+| E-1008 (intern) | Can I take 2 days off starting *PTO date*? | Not allowed: interns are not covered by the PTO policy; their agreement governs time off |
 | E-1008 (intern) | By December 15th 2027, how many PTO days will I have? | Stays at 0 (compare with E-1002's 19.17) |
 | E-1003 (contractor) | How much PTO do I have? | Contractors are not covered; their contract governs |
 | E-1006 (part-time) | What benefits am I enrolled in? | The employee's benefits record |
 | E-1007 | Can I expense a $280 chair for my home office? | Allowed: under the $300 limit |
-| E-1004 | Can I work remotely from Oregon for 3 weeks starting December 7? | Not allowed until security training is complete |
+| E-1004 | Can I work remotely from Oregon for 3 weeks starting *remote date*? | Not allowed until security training is complete |
 
 ## Clarifying questions
 

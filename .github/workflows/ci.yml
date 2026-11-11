@@ -52,7 +52,9 @@ jobs:
           python -c "import json; h = json.load(open('health.json')); assert h['mcp']['connected'] and h['mcp']['tool_count'] >= 5, h"
 
   # Deploys only after every test passes, and only from main. Render's own auto-deploy is off
-  # (render.yaml), so this job is the only path to production.
+  # (render.yaml), so this job is the only path to production. Until the Render service and its
+  # deploy-hook secret exist, the job skips with a warning instead of failing; re-run it once
+  # the secret is added.
   deploy:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -60,17 +62,20 @@ jobs:
     environment: production
     steps:
       - name: Trigger Render deploy
+        id: hook
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
           if [ -z "$HOOK" ]; then
-            echo "::error::RENDER_DEPLOY_HOOK_URL secret is not set"; exit 1
+            echo "::warning::RENDER_DEPLOY_HOOK_URL secret is not set, so nothing was deployed. Add it (repo Settings > Secrets and variables > Actions) and re-run this job."
+            echo "triggered=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
           curl -fsS -X POST "$HOOK" > /dev/null
+          echo "triggered=true" >> "$GITHUB_OUTPUT"
           echo "Deploy triggered"
 
       - name: Wait for the new deploy to report healthy
-        if: vars.RENDER_APP_URL != ''
+        if: steps.hook.outputs.triggered == 'true' && vars.RENDER_APP_URL != ''
         env:
           APP_URL: ${{ vars.RENDER_APP_URL }}
         run: |

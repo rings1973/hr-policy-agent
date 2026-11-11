@@ -116,6 +116,20 @@ Render's own auto-deploy is off (`render.yaml`), so CI is the only path to produ
 Render free tier: the service sleeps after 15 minutes idle, and the first request after that
 takes about a minute. A `Dockerfile` is included as a portable alternative.
 
+### Deploy your own copy (one time)
+
+1. In the Render dashboard: **New → Blueprint**, pick this repository and branch. Render reads
+   `render.yaml`: a free Python web service whose build installs `requirements.txt` and builds
+   both indexes, with health check `/health`.
+2. Enter `GROQ_API_KEY` and `GEMINI_API_KEY` when Render asks (they are `sync: false`, so they
+   live only in Render). Apply; the first deploy runs once.
+3. Open `https://<service>.onrender.com/health`: expect `mcp.connected: true` and
+   `tool_count: 10`.
+4. Copy the service's **Deploy Hook** (Settings) into the GitHub repository secret
+   `RENDER_DEPLOY_HOOK_URL`, and set the repository variable `RENDER_APP_URL` to the service
+   URL. From then on, every push to `main` that passes CI deploys and waits for `/health`.
+   Without the secret, the `deploy` job skips with a warning instead of failing.
+
 ## Security
 
 - Keys come from environment variables only; `.env` is git-ignored.

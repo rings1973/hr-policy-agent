@@ -565,6 +565,21 @@ tool turns into text (the probe for this hit a 503); (d) `tests/test_agent.py` w
 56. *Release order: Render first (from `skapali`), then the owner's secret, then the PR to `main`.*
     Reason: the gated `deploy` job can only pass once the deploy hook secret exists, and the
     Render service must exist before its hook does.
+57. *Demo question dates are computed from today* (`request_dates` in `app/demo_questions.py`):
+    PTO requests start on a Monday at least 2 weeks out, the short-notice question starts
+    2 business days out, the domestic and abroad remote requests start on Mondays 4 and 8 weeks
+    out. Reason: the fixed dates went stale ("Monday November 9" had passed by 2026-11-11, so
+    Demo 2 would have failed the notice rule live), and "next week" was never reliable (asked on
+    a Monday it gives exactly 5 days' notice and passes). A test runs the real rules engine on
+    the computed dates for 150 consecutive days (mutation-checked); `/demo-tasks` uses the
+    agent's clock (`REFERENCE_DATE` if set). The evaluation cases keep their fixed dates because
+    the runner pins `REFERENCE_DATE=2026-10-22`. The PTO projection keeps its fixed target date
+    because it starts from the balance date in `mock_data`, not from today.
+58. *The `deploy` job skips with a warning when `RENDER_DEPLOY_HOOK_URL` is unset* (it failed
+    before). Reason: the branch should be mergeable before the owner adds the secret. A
+    deployment still happens only after the test job passes, and a set-but-broken hook still
+    fails the job; both paths were checked locally under GitHub's `bash -eo pipefail`. The
+    health wait runs only when a deploy was triggered.
 
 ## Retrospective
 
