@@ -71,14 +71,37 @@ class Judge:
                 if attempt == RATE_RETRIES:
                     raise
                 await asyncio.sleep(RATE_WAIT_S)
-        data = json.loads(reply.choices[0].message.content or "{}")
-        claims, covered = data.get("claims", []), data.get("facts", [])
+        claims, covered = parse_verdict(json.loads(reply.choices[0].message.content or "{}"))
         return {
             "groundedness": round(sum(bool(c.get("supported")) for c in claims) / len(claims), 3)
             if claims else None,
-            "correctness": round(sum(bool(f.get("covered")) for f in covered) / len(gold_facts), 3)
-            if gold_facts else None,
+            # A judge that lists a fact twice must not push the score above 1.
+            "correctness": round(min(1.0, sum(bool(f.get("covered")) for f in covered)
+                                     / len(gold_facts)), 3) if gold_facts else None,
             "claims": claims,
             "facts": covered,
             "model": self.model,
         }
+
+
+def parse_verdict(data: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Read the judge's claims and facts from the shapes models actually return.
+
+    JSON mode guarantees valid JSON, not the requested shape: the object may come wrapped in a
+    list, split across several objects, or as a bare list of claims. Entries that are not
+    objects are ignored."""
+    if isinstance(data, dict):
+        parts = [data]
+    elif isinstance(data, list):
+        parts = [p for p in data if isinstance(p, dict)]
+        if parts and not any("claims" in p or "facts" in p for p in parts):
+            parts = [{"claims": [p for p in parts if "supported" in p],
+                      "facts": [p for p in parts if "covered" in p]}]
+    else:
+        parts = []
+    claims: list[dict[str, Any]] = []
+    facts: list[dict[str, Any]] = []
+    for part in parts:
+        claims += [c for c in part.get("claims") or [] if isinstance(c, dict)]
+        facts += [f for f in part.get("facts") or [] if isinstance(f, dict)]
+    return claims, facts

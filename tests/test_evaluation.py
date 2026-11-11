@@ -16,6 +16,7 @@ from app.rag.embeddings import TfidfEmbedder
 from app.rag.index import build_index
 from app.rag.loaders import load_documents
 from evaluation import metrics, report, run_eval
+from evaluation.judge import parse_verdict
 from hr_mcp.data_store import HRDataStore
 from tests.test_mcp_server import EXPECTED_TOOLS
 
@@ -123,3 +124,23 @@ def test_runner_scores_and_reports(tmp_path):
     text = (tmp_path / "report.md").read_text("utf-8")
     assert "Workflow completion" in text and "| W03 |" in text
     assert report.latest_summary(tmp_path)["full"]["summary"]["overall"]["n"] == 2
+
+
+CLAIM = {"claim": "15 days per year", "supported": True}
+FACT = {"fact": "15 days", "covered": True}
+
+
+@pytest.mark.parametrize("reply", [
+    {"claims": [CLAIM], "facts": [FACT]},                        # the requested shape
+    [{"claims": [CLAIM], "facts": [FACT]}],                      # wrapped in a list (seen live)
+    [{"claims": [CLAIM]}, {"facts": [FACT]}],                    # split across objects
+    [CLAIM, FACT],                                               # bare entries
+    {"claims": [CLAIM, "stray text"], "facts": [FACT, None]},   # non-object entries dropped
+], ids=["object", "wrapped", "split", "bare", "junk"])
+def test_judge_reads_every_reply_shape(reply):
+    assert parse_verdict(reply) == ([CLAIM], [FACT])
+
+
+def test_judge_unusable_reply_gives_no_entries():
+    assert parse_verdict("not json data") == ([], [])
+    assert parse_verdict({"unexpected": 1}) == ([], [])

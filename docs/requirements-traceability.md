@@ -1,115 +1,111 @@
-# Assignment Flow and Requirements Checklist
+# Requirements traceability
 
-Status key: `[x]` implemented and locally verified; `[~]` partially implemented or evidence is incomplete; `[ ]` not yet satisfied.
+Each requirement of the Quantic MSAIE Project 3 brief, mapped to where it is met and how it is checked.
+Status: ✅ done and verified, 🚀 needs the live deployment (filled in `deployed.md`).
 
-## End-to-End Flow
+## 1. Environment and reproducibility
 
-```mermaid
-flowchart TD
-    A[10 synthetic Markdown and TXT sources] --> B[Heading-aware or overview chunks]
-    C[Synthetic employee JSON] --> D[EmployeeStore]
-    B --> E[TF-IDF sparse vectors in SQLite]
-    U[Browser or API client] --> F[FastAPI /chat]
-    F --> G[HRPolicyAgent intent routing]
-    G --> H[MCP tool dispatcher]
-    H --> E
-    H --> D
-    H --> I[Mock HR ticket and email tools]
-    H -. same schemas and dispatch .-> M[MCP JSON-RPC HTTP /mcp]
-    G --> J[Answer, citations, status, tool trace]
-    J --> U
-    K[22-case evaluation] --> G
-    K --> L[Quality proxies, p50/p95, top-k comparison]
-    R[GitHub Actions] --> S[Python 3.13 install and pytest]
-    S --> T[Render configuration]
-```
+| Requirement | Evidence |
+|---|---|
+| Virtual environment | `.venv` (Python 3.13); setup in [README](../README.md#run-locally) ✅ |
+| Dependencies listed | `requirements.txt` (pinned runtime), `requirements-dev.txt` (+ pytest, ruff), `pyproject.toml` ✅ |
+| README: setup, local run, deployment, evaluation | [README.md](../README.md): Run locally, Tests and evaluation, CI/CD and deployment, Deploy your own copy ✅ |
+| Fixed seeds / determinism | Deterministic chunk ids (`app/rag/chunker.py`), `SEED=42` passed to the LLM where supported (`app/agent/llm.py`), `REFERENCE_DATE` pins "today" for date rules (eval and CI use 2026-10-22), temperature 0 ✅ |
+| Secrets from environment only | `app/config.py` reads all keys from env; `.env` git-ignored; Render keys are `sync: false` in `render.yaml` ✅ |
 
-The solid path is the current local request path. `/mcp` separately exposes initialization, discovery, and tool calls over stateless HTTP; the in-process agent uses the same named dispatcher and tool schemas rather than making an HTTP round trip to itself.
+## 2. Corpus ingestion and indexing
 
-## Checklist
+| Requirement | Evidence |
+|---|---|
+| 5–20 files, 30–120 pages, HR topics | 12 documents, about 20k words (about 80 pages): PTO, holidays, remote work, expenses, data security, benefits, onboarding, equipment, leave, conduct; licenses in [SOURCES.md](../app/data/policies/SOURCES.md) ✅ |
+| At least two formats | Markdown, TXT, PDF (NIST excerpt) and HTML (OPM fact sheet): `app/rag/loaders.py`; `tests/test_rag.py` ✅ |
+| Justified chunking | Heading-aware sections; sections over 350 words split into windows with 60 words of overlap; disclaimer-only sections dropped (`app/rag/chunker.py`, rationale in [design-and-evaluation.md](../design-and-evaluation.md)) ✅ |
+| Free embedding model | Gemini `gemini-embedding-001` (free tier), TF-IDF as the keyless baseline (`app/rag/embeddings.py`) ✅ |
+| Vector store | FAISS `IndexFlatIP` + SQLite metadata + `manifest.json` (`app/rag/index.py`), built by `python -m app.rag.ingest` ✅ |
+| Citation metadata | Each chunk stores doc id, title, section, page, source type and snippet ✅ |
 
-### 1. Environment and Reproducibility
-- [x] Dependencies are declared in `requirements.txt`; Python 3.13 is used by the container and CI.
-- [x] `README.md` documents local setup, run, deployment configuration, and evaluation commands.
-- [x] Retrieval ordering is deterministic for a fixed corpus and query; no evaluation sampling is used.
-- [x] Secrets are read from environment variables and `.env` is excluded from Git.
-- [~] A local virtual environment is available in the development workspace, but it is not part of the repository; users create it from the documented commands.
+## 3. RAG
 
-### 2. Policy Corpus Ingestion and Indexing
-- [x] Ten synthetic Markdown/TXT policy files contain approximately 11,459 words, or about 46 standard 250-word pages, within the requested 5-20 files and approximate 30-120 page range.
-- [x] Markdown headings are used as section-aware chunks; section metadata and citation snippets are returned.
-- [x] Plain-text TXT sources are ingested as overview chunks in addition to Markdown.
-- [~] Deterministic corpus-fitted TF-IDF sparse vectors are persisted with chunk metadata in SQLite. This is a modest local vector baseline, not a pretrained semantic embedding model.
-- [x] The corpus covers PTO, holidays, remote work, expenses, data security, benefits, onboarding, equipment, leave, and respectful workplace conduct.
+| Requirement | Evidence |
+|---|---|
+| Top-k with filtering | `search_policy_documents(query, k, document_id, include_external)`, per-embedder `MIN_SCORE` marks weak evidence ✅ |
+| Retrieved chunks and metadata injected into the prompt | Tool results carry chunk text and metadata into the model context (`app/agent/orchestrator.py`, `app/agent/prompts.py`) ✅ |
+| Answers cite ids, sections and snippets | `final_answer.citations`, validated against chunks actually returned this turn (`app/agent/guardrails.py: validate_citations`) ✅ |
+| Guardrails: out-of-corpus, unsupported claims, facts vs recommendations | `pre_route` (out-of-scope, legal, sensitive HR, emergency), "not covered" reply without evidence, separate `policy_facts` and `recommendations` fields; `tests/test_agent.py` ✅ |
+| A multi-document question | 5 `multi_doc` cases in `evaluation/cases.yaml` ✅ |
 
-### 3. Retrieval-Augmented Generation
-- [x] Top-k policy retrieval and source snippets are included in `/chat` responses.
-- [~] Answers include retrieved policy text as a clearly labeled basis and escalate on empty retrieval, but workflow summaries remain rule-based templates rather than a general grounded language-model synthesis.
-- [~] There are out-of-scope and ambiguity responses, but they are keyword-based and do not consistently refuse when retrieval evidence is empty or weak.
-- [~] The benchmark includes multi-policy questions, but multi-document evidence use is not independently enforced or scored.
+## 4. Agentic system
 
-### 4. Agentic System Design
-- [x] The agent selects named policy and employee tools for remote-work, PTO, benefits, and mock communication workflows.
-- [~] Tool selection is deterministic rule-based routing; it is not a general intent planner, and some employee IDs and answer details are fixed in code.
-- [x] `/chat` returns operational tool names, arguments, results, citations, and status; this is an architectural trace, not hidden chain-of-thought.
-- [~] Missing employees return tool errors, and drafts/tickets are mock-only; clarification and escalation handling is limited.
-- [x] No real HR record is changed and no email is sent.
+| Requirement | Evidence |
+|---|---|
+| Orchestrator: intent, RAG vs tools, synthesis | `app/agent/orchestrator.py` (LLM tool loop, max 8 steps, finalize step) ✅ |
+| At least two multi-step workflows | Remote work eligibility and PTO request with manager email (Demo 1 and Demo 2), plus expense, benefits and PTO projection ([docs/demo-questions.md](demo-questions.md)) ✅ |
+| Operational trace | `tool_trace` in every `/chat` response (tool, arguments, result summary, latency), shown in the UI's trace panel; JSON-lines log (`app/agent/trace.py`) ✅ |
+| Graceful failures | Unknown employee: `ToolError`, then clarify. No employee: clarify. Provider errors: fallback chain, then `degraded`. MCP down: `/health` shows `connected: false` ✅ |
+| No irreversible actions | Tickets are two-phase (proposed, then created only on the user's Confirm); the LLM never sees `confirmation_token`; emails are drafts only (`draft_not_sent`); tests in `tests/test_mcp_server.py`, `tests/test_app.py` ✅ |
 
-### 5. MCP Server and Tool Integration
-- [x] Eight named tools are exposed, including policy search and structured employee lookup.
-- [x] `/mcp` implements stateless JSON-RPC initialization, tool discovery, and tool calls over HTTP using the same dispatcher used by the agent.
-- [x] Tests exercise MCP initialization, discovery, and an employee lookup call.
-- [~] The integration is a small in-repo protocol implementation; interoperability with an independent MCP SDK/client has not yet been verified.
-- [x] Tool schemas are returned by discovery, and mock actions remain non-production.
+## 5. MCP
 
-### 6. Web Application
-- [x] FastAPI provides `/chat`, `/health`, `/evaluate`, and `/demo-tasks` plus a browser chat UI.
-- [x] `/health` reports app and tool-server status; the chat response contains answer, citations, status, and tool trace.
-- [x] Two reproducible demo tasks are exposed for remote work eligibility and PTO guidance.
-- [~] The demo prompts are available through the API endpoint and README, not as dedicated UI controls.
+| Requirement | Evidence |
+|---|---|
+| MCP server | `hr_mcp/server.py` (official MCP Python SDK 2.3.0, `MCPServer`), stdio subprocess started by the app ✅ |
+| At least 5 tools, including a RAG tool and a mock-data tool | 10 tools: `search_policy_documents`, `get_policy_section`, `list_policy_documents`, `lookup_employee_profile`, `check_pto_balance`, `project_pto_balance`, `lookup_benefits_status`, `check_policy_compliance`, `draft_hr_email`, `create_mock_hr_ticket` ✅ |
+| The agent really calls MCP | `app/agent/mcp_client.py` (`ClientSession` over stdio, `list_tools` discovery, `call_tool`); no direct function calls ✅ |
+| Architecture, transport, schemas and discovery documented | [design-and-evaluation.md](../design-and-evaluation.md) sections 1–4 ✅ |
 
-### 7. Deployment
-- [x] A free-tier single-service Render configuration and Dockerfile are present.
-- [ ] A deployed, accessible shareable URL has not been verified or recorded. Deployment requires access to the user's hosting account.
-- [ ] Cold-start behavior has not been measured or documented from a live hosted service.
+## 6. Web application
 
-### 8. CI/CD
-- [x] GitHub Actions installs requirements and runs pytest on pushes and pull requests using Python 3.13.
-- [x] Tests verify app health/startup through FastAPI's test client and exercise MCP tool discovery/calling.
-- [~] CI does not automatically deploy; deployment is not configured as a post-test workflow.
+| Requirement | Evidence |
+|---|---|
+| Chat interface | FastAPI + `app/static/index.html`: employee picker, question library, answer cards, sources, trace, Confirm/Cancel ✅ |
+| `/chat` with answer, citations, snippets and trace | `POST /chat`; `POST /chat/confirm` for pending actions ✅ |
+| `/health` with MCP status | `GET /health`: app status, `mcp.connected`, `tool_count`, index info ✅ |
+| Grader can reproduce two demo tasks | UI question library and `GET /demo-tasks` (dates computed from today, checked by `tests/test_demo_questions.py`); `curl` examples in the README ✅ |
 
-### 9. Agent Evaluation
-- [x] The evaluation set has 22 cases with categories and expected answer keywords/tools.
-- [~] `/evaluate` reports keyword groundedness, source-section citation validity, expected-tool overlap, workflow completion, and safety pass rate. These are proxy metrics; cases include gold keywords rather than complete reference answers or human-judged labels.
-- [x] Runtime reports measured p50/p95 for the current in-process benchmark run.
-- [~] Retrieval comparison reports expected-keyword coverage for `k=1`, `3`, and `5`; the comparison is a lightweight ablation, not a statistically repeated experiment.
-- [ ] Cold-start versus warm-start latency has not been reported.
+## 7. Deployment
 
-#### Local Benchmark Snapshot
+| Requirement | Evidence |
+|---|---|
+| Free-tier host, shareable URL | Render Blueprint `render.yaml` (free web service) ✅; live URL in [deployed.md](../deployed.md) 🚀 |
+| Single service with env vars | Web app, agent, MCP subprocess and FAISS index in one service; keys as Render env vars ✅ |
+| No paid database | Index built at deploy time; mock data committed as JSON ✅ |
+| Cold start documented | Behaviour documented in [deployed.md](../deployed.md) ✅; measured numbers 🚀 |
 
-Run from the configured Python 3.13 environment on 2026-10-05; rerun `/evaluate` for current measurements. Latency is warm in-process agent handling after app/index construction, not network or cold-start latency.
+## 8. CI/CD
 
-| Metric | Result |
-| --- | ---: |
-| Cases | 22 |
-| Keyword groundedness proxy | 0.886 |
-| Citation source-section accuracy | 0.955 |
-| Expected-tool selection overlap | 0.909 |
-| Multi-step workflow completion proxy | 0.955 |
-| Safety pass proxy | 0.955 |
-| Request latency p50 / p95 | 0.98 / 1.09 ms |
+| Requirement | Evidence |
+|---|---|
+| Runs on push and PR | `.github/workflows/ci.yml` (`push` to main and skapali, `pull_request`) ✅ |
+| Install, build/start check, tests | Lint, import check, keyless index build, pytest (241 tests), retrieval ablation, smoke test that starts the app ✅ |
+| App start test and MCP discovery test | Smoke test asserts `/health` shows MCP connected with ≥5 tools; `tests/test_mcp_server.py` uses a real stdio `ClientSession` for discovery and calls ✅ |
+| Deploy only if tests pass | `deploy` job: `needs: test`, `main` only, calls the Render deploy hook; Render auto-deploy is off ✅ |
 
-Retrieval expected-keyword coverage was 0.701 at `k=1`, 0.860 at `k=3`, and 0.871 at `k=5`. This supports `k=3` as a reasonable context-size/coverage tradeoff in this small test set, but does not establish statistically robust quality.
+## 9. Evaluation
 
-### 10. Design Documentation
-- [x] The README describes the application components, demo tasks, and single-service deployment shape.
-- [~] This document adds the flow and implementation traceability, but the design rationale for chunk sizing, retrieval choices, model/provider choices, and safety limitations needs expansion alongside the corpus/index work.
+| Requirement | Evidence |
+|---|---|
+| 20–30 cases with gold answers across all categories | 28 cases in `evaluation/cases.yaml`: 8 single-doc, 5 multi-doc, 8 workflow, 3 ambiguous, 4 adversarial ✅ |
+| Groundedness, citation accuracy, partial match | `evaluation/metrics.py` + LLM judge (`evaluation/judge.py`); results in [evaluation/report.md](../evaluation/report.md) ✅ |
+| Tool selection, workflow completion, clarify/escalate, action safety | Same report ✅ |
+| Latency p50/p95, cold vs warm | Local p50/p95 in the report ✅; deployed warm and cold numbers in `deployed.md` 🚀 |
+| At least one ablation | Retrieval top-k × embedder, and full tools vs RAG only on the workflow cases ✅ |
 
-## Remaining Work to Reach Full Compliance
+## 10. Design documentation
 
-1. The target source count and approximate page volume are now met; validate page length in the final rendered format if a stricter pagination definition is required.
-2. Assess whether a pretrained local/free semantic embedding model improves retrieval over the persisted TF-IDF baseline; record chunking and retrieval parameter choices.
-3. Replace remaining fixed workflow answer templates with evidence-driven synthesis, add robust weak-evidence and missing-identity handling, and include complete gold answers for all evaluation cases.
-4. Independently verify `/mcp` with an MCP SDK client, then document the exact transport and client-discovery sequence.
-5. Deploy the service through the user's Render account, record its public URL, and capture cold/warm latency evidence.
-6. Extend CI to deploy only after tests pass if automatic deployment is required.
+| Requirement | Evidence |
+|---|---|
+| Design choices justified | [design-and-evaluation.md](../design-and-evaluation.md); every decision with its reason in [ai-tooling.md](../ai-tooling.md) ✅ |
+| Architecture diagram | Mermaid diagrams in the README and design document ✅ |
+| Two demo tasks and their MCP call sequences | design-and-evaluation.md and [docs/demo-questions.md](demo-questions.md) ✅ |
+
+## Submission files
+
+| Required | In the repo |
+|---|---|
+| README.md | ✅ (deployed URL 🚀) |
+| design-and-evaluation.md | ✅ |
+| ai-tooling.md | ✅ |
+| deployed.md | ✅ (URLs and measurements 🚀) |
+| evaluation/ | ✅ cases, scripts, results, report |
+| mock_data/ | ✅ |
+| mcp/ (or equivalent) | ✅ `hr_mcp/` (named so it does not shadow the `mcp` SDK package) |

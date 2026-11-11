@@ -78,6 +78,9 @@ the model makes; only `/chat/confirm` sends it.
 
 ## 4. Demo tasks and their MCP call sequences
 
+The app computes request dates from today (`app/demo_questions.py`), so the questions always ask
+about future dates. The examples below use the dates shown on 2026-11-11.
+
 **Demo 1, remote work abroad** (acting as E-1001): _"Can I work from Mexico City for 6 weeks
 starting January 11, 2027? If it needs a review, open a ticket."_
 
@@ -91,13 +94,13 @@ starting January 11, 2027? If it needs a review, open a ticket."_
    ticket `HR-0003`.
 
 **Demo 2, PTO with a manager email** (acting as E-1002): _"Can I take 3 days of PTO starting
-Monday November 9? If yes, draft an email to my manager."_
+Monday, November 30, 2026? If yes, draft an email to my manager."_
 
-1. `check_policy_compliance(request_type=pto, employee_id=E-1002, days=3, start_date=2026-11-09)`
-   → `allowed_with_approval` (7 days available, notice met), Nov 9–11.
+1. `check_policy_compliance(request_type=pto, employee_id=E-1002, days=3, start_date=2026-11-30)`
+   → `allowed_with_approval` (7 days available, notice met), Nov 30–Dec 2.
 2. `search_policy_documents("PTO notice manager approval")`.
-3. `draft_hr_email(recipient_id=MANAGER, employee_id=E-1002, ...)` → draft to Jordan Rivera (M-42),
-   `draft_not_sent`.
+3. `draft_hr_email(recipient_id=MANAGER, employee_id=E-1002, ...)` → draft from Marcus Lee to
+   Jordan Rivera (M-42), name placeholders filled in, `draft_not_sent`.
 4. Answer with citations, status `ok`.
 
 ## 5. Evaluation
